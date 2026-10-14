@@ -49,7 +49,6 @@
   <div><label>Jam</label><input id="jam" type="time"></div>
   <div><label>Zona</label><input id="tz" value="WIT"></div>
  </div>
- <label>Note</label><input id="cat" value="Dokumentasi Kegiatan">
  
  <hr style="border:0;border-top:1px dashed #ccc;margin:15px 0;">
  
@@ -63,7 +62,8 @@
 const $=id=>document.getElementById(id);
 let img=null; const tileCache=new Map();
 const two=n=>String(n).padStart(2,'0');
-const MAX_IMG_SIZE = 1600; 
+// Ukuran maksimal gambar diturunkan ke 1200px agar pemrosesan semakin ringan dan cepat
+const MAX_IMG_SIZE = 1200; 
 
 (()=>{const n=new Date();
  $('tgl').value=`${n.getFullYear()}-${two(n.getMonth()+1)}-${two(n.getDate())}`;
@@ -76,7 +76,6 @@ function getDecimalGPS(data, ref) {
     return dec.toFixed(6);
 }
 
-// Convert format desimal ke format rasional EXIF (Derajat, Menit, Detik)
 function getExifGPSCoordinate(dec) {
     let abs = Math.abs(dec);
     let deg = Math.floor(abs);
@@ -191,7 +190,10 @@ function flag(c,x,y,w){const h=w*.68;
 
 function tulis(c,t,x,y,maxW,fs,warna,bold=''){
  let s=fs;c.font=`${bold} ${s}px Arial`;
- while(c.measureText(t).width>maxW&&s>fs*.45){s*=.95;c.font=`${bold} ${s}px Arial`;}
+ while(c.measureText(t).width>maxW&&s>fs*.45){
+     s*=.95; // Aman, s akan terus mengecil menghindari infinite loop
+     c.font=`${bold} ${s}px Arial`;
+ }
  c.fillStyle=warna;c.fillText(t,x,y);}
 
 async function render(){
@@ -210,17 +212,18 @@ async function render(){
  
  c.drawImage(img, 0, 0, W, H);
  
- const f1=W*.037,f2=W*.020,f3=W*.0225,f4=W*.0205,pad=W*.011,padX=W*.014;
+ const f1=W*.037, f2=W*.020, f3=W*.0225, pad=W*.011, padX=W*.014;
  const judul=$('nama').value.trim(), alamat=$('alamat').value.trim();
  const koord=`Lat ${$('lat').value}, Long ${$('lng').value}`;
  const d=$('tgl').value?new Date($('tgl').value+'T00:00:00'):new Date();
  const hari=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][d.getDay()];
  let[h,m]=$('jam').value.split(':');h=+h;
  const waktu=`${hari}, ${two(d.getDate())}/${two(d.getMonth()+1)}/${d.getFullYear()} ${h%12||12}:${m} ${h>=12?'PM':'AM'} ${$('tz').value}`;
- const note='Note : '+($('cat').value.trim()||'-');
- const tot=f1*1.16+(f2+f3*2+f4)*1.36+pad*2;
- const stripH=Math.round(Math.min(Math.max(tot,W*.15),W*.25));
- const y0=H-stripH, mapW=Math.round(stripH);
+ 
+ // Penyesuaian tinggi panel bawah karena Note dihapus
+ const tot = f1*1.16 + (f2+f3*2)*1.36 + pad*2;
+ const stripH = Math.round(Math.min(Math.max(tot, W*.13), W*.20));
+ const y0 = H-stripH, mapW = Math.round(stripH);
  
  const peta=await buatPeta(parseFloat($('lat').value),parseFloat($('lng').value),+$('zoom').value,mapW,stripH);
  if(peta.ok)c.drawImage(peta.off,peta.sx,peta.sy,peta.cw,peta.ch,0,y0,mapW,stripH);
@@ -238,16 +241,23 @@ async function render(){
  c.textBaseline='top';
  let y=y0+pad;
  
- c.font=`bold ${f1}px Arial`;
- let tw=c.measureText(judul).width, fw=f1*.62, gap=f1*.28;
- while(judul&&tw+fw+gap>maxW&&f1>2){c.font=`bold ${f1*.97}px Arial`;tw=c.measureText(judul).width;}
+ // PERBAIKAN INFINITE LOOP DI SINI
+ let curF1 = f1;
+ c.font=`bold ${curF1}px Arial`;
+ let tw=c.measureText(judul).width, fw=curF1*.62, gap=curF1*.28;
+ while(judul && tw+fw+gap > maxW && curF1 > 2){
+     curF1 *= 0.95;
+     c.font=`bold ${curF1}px Arial`;
+     tw=c.measureText(judul).width;
+     fw=curF1*.62; gap=curF1*.28;
+ }
+ 
  c.fillStyle='#fff';if(judul)c.fillText(judul,tx,y);
- flag(c,tx+tw+gap,y+f1*.14,fw);
- y+=f1*1.16+pad*.2;
+ flag(c,tx+tw+gap,y+curF1*.14,fw);
+ y+=curF1*1.16+pad*.2;
  tulis(c,alamat,tx,y,maxW,f2,'#d9d9d9'); y+=f2*1.36;
  tulis(c,koord,tx,y,maxW,f3,'#fff');     y+=f3*1.36;
- tulis(c,waktu,tx,y,maxW,f3,'#fff');     y+=f3*1.36;
- tulis(c,note,tx,y,maxW,f4,'#e8e8e8');
+ tulis(c,waktu,tx,y,maxW,f3,'#fff');
  
  const bh=stripH*.22,bw=bh*2.55,mg=W*.008;
  const bx=W-bw-mg, by=y0-bh*.30;
@@ -262,11 +272,9 @@ async function render(){
 function unduh(){
     $('st').textContent='⏳ Menanamkan (Injecting) EXIF & Mengunduh...';
     
-    // 1. Ambil format Base64 dari Canvas
     const jpegData = cv.toDataURL('image/jpeg', 0.90);
     
     try {
-        // 2. Siapkan data Latitude, Longitude, & Waktu
         let lat = parseFloat($('lat').value);
         let lng = parseFloat($('lng').value);
         let latRef = lat < 0 ? "S" : "N";
@@ -277,7 +285,6 @@ function unduh(){
         if(jam.length === 5) jam += ":00";
         let dateTimeStr = tgl + " " + jam;
 
-        // 3. Bangun struktur EXIF IFD
         let zerothIfd = {};
         let exifIfd = {};
         let gpsIfd = {};
@@ -294,10 +301,8 @@ function unduh(){
         let exifObj = {"0th": zerothIfd, "Exif": exifIfd, "GPS": gpsIfd};
         let exifBytes = piexif.dump(exifObj);
         
-        // 4. Masukkan struktur EXIF ke dalam Data Gambar
         let newJpeg = piexif.insert(exifBytes, jpegData);
         
-        // 5. Unduh file hasil injeksi
         const a = document.createElement('a');
         a.download = `Geotag_${$('tgl').value}_${$('jam').value.replace(':','')}.jpg`;
         a.href = newJpeg;
@@ -305,7 +310,6 @@ function unduh(){
         $('st').textContent='✅ File berhasil diunduh dengan Metadata!';
         
     } catch (e) {
-        // Fallback jika terjadi error pada Piexif
         console.error("Gagal inject EXIF: ", e);
         const a = document.createElement('a');
         a.download = `Geotag_${$('tgl').value}_${$('jam').value.replace(':','')}.jpg`;
@@ -315,7 +319,8 @@ function unduh(){
     }
 }
 
-['lat','lng','zoom','tgl','jam','tz','cat'].forEach(id=>$(id).addEventListener('change',render));
+// Menghapus 'cat' (Note) dari daftar event listener
+['lat','lng','zoom','tgl','jam','tz'].forEach(id=>$(id).addEventListener('change',render));
 ['nama','alamat'].forEach(id=>$(id).addEventListener('change', () => { if(img) render(); }));
 </script>
 </body>

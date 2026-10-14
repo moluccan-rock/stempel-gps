@@ -29,8 +29,8 @@
  <input type="file" id="foto" accept="image/*">
 </div>
 <div class="card">
- <label>Baris 1 — Nama tempat (Besar)</label><input id="nama" value="Kantor Camat Sirimau">
- <label>Baris 2 — Alamat detail (Kecamatan / Desa)</label><input id="alamat" value="Sirimau, Ambon, Maluku">
+ <label>Baris 1 — Nama tempat (Besar)</label><input id="nama" value="Kecamatan Sirimau, Kota Ambon, Maluku">
+ <label>Baris 2 — Alamat detail (Kecamatan / Desa)</label><input id="alamat" value="Karang Panjang">
  <button class="geo" onclick="cariKoordinat()">🔍 Cari Koordinat dari Alamat</button>
  
  <hr style="border:0;border-top:1px dashed #ccc;margin:15px 0;">
@@ -62,7 +62,6 @@
 const $=id=>document.getElementById(id);
 let img=null; const tileCache=new Map();
 const two=n=>String(n).padStart(2,'0');
-// Ukuran maksimal gambar diturunkan ke 1200px agar pemrosesan semakin ringan dan cepat
 const MAX_IMG_SIZE = 1200; 
 
 (()=>{const n=new Date();
@@ -124,25 +123,50 @@ function lokasiSaya(){
     }, e => alert("Gagal melacak GPS. Pastikan izin lokasi browser aktif."));
 }
 
+// Pencarian Koordinat Pintar (Multi-Query / Multi-Variasi)
 async function cariKoordinat() {
-    const query = $('nama').value.trim() + ', ' +$('alamat').value.trim();
-    if (query.length < 5) return alert("Isi nama tempat dan alamat detail dengan jelas.");
+    const nama = $('nama').value.trim();
+    const alamat = $('alamat').value.trim();
+    
+    if (!nama && !alamat) return alert("Isi nama tempat atau alamat terlebih dahulu.");
     
     $('st').textContent = '⏳ Mencari koordinat...';
-    try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`);
-        const data = await res.json();
-        if (data && data.length > 0) {
-            $('lat').value = parseFloat(data[0].lat).toFixed(6);
-            $('lng').value = parseFloat(data[0].lon).toFixed(6);$('st').textContent = '✅ Koordinat ditemukan dari alamat!';
-            if(img) render();
-        } else {
-            $('st').textContent = '⚠️ Alamat tidak spesifik, koordinat tidak ditemukan.';
-            alert("Koordinat tidak ditemukan. Coba gunakan nama kecamatan atau kota.");
+    
+    const bersihkan = (text) => text.replace(/Kecamatan|Kota|Provinsi|Kabupaten/gi, '').replace(/\s+/g, ' ').trim();
+    const namaBersih = bersihkan(nama);
+    const alamatBersih = bersihkan(alamat);
+
+    // Buat daftar variasi pencarian dari yang detail/spesifik ke umum
+    const queries = [
+        `${alamat}, ${nama}`,                            // e.g., "Karang Panjang, Kecamatan Sirimau, Kota Ambon..."
+        `${alamatBersih}, ${namaBersih}`,                 // e.g., "Karang Panjang, Sirimau, Ambon..."
+        `${alamat}, Ambon`,                               // e.g., "Karang Panjang, Ambon"
+        `${alamatBersih}, Ambon`,                        
+        `${nama}, ${alamat}`,
+        `${namaBersih}`,
+        `${alamat}`
+    ];
+
+    // Hapus duplikat dan query kosong
+    const uniqueQueries = [...new Set(queries)].filter(q => q && q.length > 2);
+
+    for (let q of uniqueQueries) {
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            if (data && data.length > 0) {
+                $('lat').value = parseFloat(data[0].lat).toFixed(6);
+                $('lng').value = parseFloat(data[0].lon).toFixed(6);$('st').textContent = `✅ Koordinat ditemukan!`;
+                if(img) render();
+                return; // Berhasil! Keluar dari fungsi
+            }
+        } catch(e) {
+            console.error("Gagal cari query:", q, e);
         }
-    } catch(err) {
-        $('st').textContent = '⚠️ Gagal mencari koordinat.';
     }
+
+    $('st').textContent = '⚠️ Koordinat tidak ditemukan dari alamat tersebut.';
+    alert("Koordinat tidak ditemukan. Coba persingkat nama tempat atau gunakan kata yang lebih spesifik (contoh Baris 2: 'Karang Panjang, Ambon').");
 }
 
 function loadTile(z,x,y){
@@ -191,7 +215,7 @@ function flag(c,x,y,w){const h=w*.68;
 function tulis(c,t,x,y,maxW,fs,warna,bold=''){
  let s=fs;c.font=`${bold} ${s}px Arial`;
  while(c.measureText(t).width>maxW&&s>fs*.45){
-     s*=.95; // Aman, s akan terus mengecil menghindari infinite loop
+     s*=.95;
      c.font=`${bold} ${s}px Arial`;
  }
  c.fillStyle=warna;c.fillText(t,x,y);}
@@ -220,7 +244,6 @@ async function render(){
  let[h,m]=$('jam').value.split(':');h=+h;
  const waktu=`${hari}, ${two(d.getDate())}/${two(d.getMonth()+1)}/${d.getFullYear()} ${h%12||12}:${m} ${h>=12?'PM':'AM'} ${$('tz').value}`;
  
- // Penyesuaian tinggi panel bawah karena Note dihapus
  const tot = f1*1.16 + (f2+f3*2)*1.36 + pad*2;
  const stripH = Math.round(Math.min(Math.max(tot, W*.13), W*.20));
  const y0 = H-stripH, mapW = Math.round(stripH);
@@ -241,7 +264,6 @@ async function render(){
  c.textBaseline='top';
  let y=y0+pad;
  
- // PERBAIKAN INFINITE LOOP DI SINI
  let curF1 = f1;
  c.font=`bold ${curF1}px Arial`;
  let tw=c.measureText(judul).width, fw=curF1*.62, gap=curF1*.28;
@@ -319,7 +341,6 @@ function unduh(){
     }
 }
 
-// Menghapus 'cat' (Note) dari daftar event listener
 ['lat','lng','zoom','tgl','jam','tz'].forEach(id=>$(id).addEventListener('change',render));
 ['nama','alamat'].forEach(id=>$(id).addEventListener('change', () => { if(img) render(); }));
 </script>

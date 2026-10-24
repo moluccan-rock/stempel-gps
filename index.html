@@ -165,6 +165,24 @@
 <section class="card" aria-labelledby="h-hasil">
  <h2 id="h-hasil">5 · Hasil</h2>
  <div class="row" style="margin-top:4px">
+  <div><label for="resizeMode">Ukuran foto (lebar px)</label>
+   <select id="resizeMode" onchange="toggleResizeCustom()">
+    <option value="asli" selected>Asli (tanpa resize)</option>
+    <option value="640">640 px</option>
+    <option value="1024">1024 px</option>
+    <option value="1280">1280 px</option>
+    <option value="1600">1600 px</option>
+    <option value="2048">2048 px</option>
+    <option value="custom">Atur sendiri</option>
+   </select>
+  </div>
+  <div id="resizeCustomWrap" style="display:none">
+   <label for="resizeCustom">Lebar target (px)</label>
+   <input id="resizeCustom" type="number" min="320" max="4096" step="10" value="1280" inputmode="numeric">
+  </div>
+ </div>
+ <p class="hint" style="margin-top:8px">Foto kecil bisa <b>diperbesar</b> (upscale) dan foto besar bisa <b>diperkecil</b> (downscale) — tinggi mengikuti otomatis (rasio asli dipertahankan). "Asli" = tanpa resize (maks 2000 px). Upscale besar bisa terlihat agak lembut — gunakan seperlunya.</p>
+ <div class="row" style="margin-top:4px">
   <div><label for="ukuranMode">Target ukuran file</label>
    <select id="ukuranMode" onchange="toggleUkuranCustom()">
     <option value="500">&lt; 500 KB</option>
@@ -184,7 +202,7 @@
    </select>
   </div>
  </div>
- <p class="hint" style="margin-top:8px">Saat klik <b>"Buat geotag"</b>, foto dikompresi otomatis (kualitas JPEG diturunkan dulu; kalau masih kebesaran &amp; "Kecilkan dimensi" = Boleh, dimensi dikecilkan) sampai di bawah target. Pilih <b>"Tanpa batas"</b> utk kualitas penuh tanpa kompresi.</p>
+ <p class="hint" style="margin-top:8px">Urutan proses saat klik <b>"Buat geotag"</b>: (1) foto di-resize ke lebar target di atas (bisa perbesar/perkecil), (2) stempel geotag digambar, (3) file dikompresi (kualitas JPEG diturunkan; kalau masih kebesaran &amp; "Kecilkan dimensi" = Boleh, dimensi dikecilkan lagi) sampai di bawah target ukuran file. Pilih <b>"Tanpa batas"</b> utk kualitas penuh tanpa kompresi.</p>
  <div class="actions" style="margin-top:8px">
   <button type="button" id="btnBuat" onclick="buatGeotag()">
    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -337,7 +355,7 @@ async function muatGambar(file){
   });
 }
 
-$('foto').onchange=async e=>{
+ $('foto').onchange=async e=>{
   const file=e.target.files[0];
   if(!file) return;
   const nama=(file.name||'').toLowerCase(), tipe=(file.type||'').toLowerCase();
@@ -828,9 +846,24 @@ async function render(){
   setStatus('⏳ Memproses gambar & memuat peta...');
 
   const iw=img.naturalWidth||img.width, ih=img.naturalHeight||img.height;
-  let scale=1;
-  if(iw>MAX_IMG_SIZE||ih>MAX_IMG_SIZE) scale=Math.min(MAX_IMG_SIZE/iw,MAX_IMG_SIZE/ih);
-  const W=Math.round(iw*scale), H=Math.round(ih*scale);
+  // Bug #27: resize dimensi sesuai keinginan — kecil bisa DIPERBESAR (upscale),
+  // besar bisa DIPERKECIL (downscale). Target user menimpa cap MAX_IMG_SIZE.
+  const targetW=ambilResizeTarget();
+  let W, H, resizeInfo=null;
+  if(targetW>0){
+    W=targetW; H=Math.max(1,Math.round(targetW*ih/iw));
+  }else{
+    let scale=1;
+    if(iw>MAX_IMG_SIZE||ih>MAX_IMG_SIZE) scale=Math.min(MAX_IMG_SIZE/iw,MAX_IMG_SIZE/ih);
+    W=Math.round(iw*scale); H=Math.round(ih*scale);
+  }
+  if(iw>0 && ih>0 && (W!==iw||H!==ih)){
+    resizeInfo={
+      dariW:iw, dariH:ih,
+      arah: W>iw?'upscale':'downscale',
+      faktor:+(W/iw).toFixed(2)
+    };
+  }
 
   const f1=W*.037, f2=W*.020, f3=W*.0225, pad=W*.011, padX=W*.014;
 
@@ -850,7 +883,8 @@ async function render(){
 
   cv.width=W; cv.height=H; cv.style.display='block';
   const c=cv.getContext('2d');
-  c.drawImage(img,0,0,W,H);
+  // Bug #27: gambar foto dgn resampling bertahap (upscale/downscale mulus)
+  gambarBerkualitas(c,img,W,H);
 
   // Bug #21: Gambar peta dengan perspektif 3D (trapesium)
   if(peta.ok) draw3DMap(c, peta.off, peta.sx, peta.sy, peta.cw, peta.ch, 0, y0, mapW, stripH, 0.32);
@@ -904,7 +938,8 @@ async function render(){
     altitude:ambilAltitude(),
     keepExif:$('keepExif').checked,
     keepImgDesc:$('keepImgDesc').checked,
-    origExif:originalExif
+    origExif:originalExif,
+    resizeInfo                                   // Bug #27: info resize utk panel pratinjau
   };
 
   let msg='✅ Selesai — cek preview lalu Download JPG';
@@ -1064,6 +1099,53 @@ function verifikasi(newJpeg,m){
   }catch(err){ return {ok:false,error:err.message}; }
 }
 
+/* ---------- Bug #27: Resize dimensi dua arah — perbesar (upscale) / perkecil (downscale) ---------- */
+// Baca target lebar (px) dari UI. 0 = asli (tanpa resize).
+function ambilResizeTarget(){
+  const mode=$('resizeMode')?$('resizeMode').value:'asli';
+  if(mode==='asli') return 0;
+  if(mode==='custom'){
+    const v=parseInt(String($('resizeCustom')?$('resizeCustom').value:'').trim(),10);
+    if(isFinite(v)&&v>=320&&v<=4096) return v;
+    return 1280;
+  }
+  const v=parseInt(mode,10); return isFinite(v)&&v>0?v:0;
+}
+// Tampil/sembunyi input "atur sendiri" (lebar px)
+function toggleResizeCustom(){
+  const w=$('resizeCustomWrap'); if(!w) return;
+  w.style.display=($('resizeMode').value==='custom')?'block':'none';
+}
+// Resampling bertahap supaya upscale/downscale besar tetap mulus:
+// - downscale >2x: halving bertahap (lebih halus daripada drawImage langsung)
+// - upscale: doubling bertahap sampai >= target, lalu pass final ke dimensi eksak
+function gambarBerkualitas(c, sumber, W, H){
+  const sw=sumber.naturalWidth||sumber.width||W;
+  const sh=sumber.naturalHeight||sumber.height||H;
+  const setKualitas=ctx=>{ ctx.imageSmoothingEnabled=true; if(ctx.imageSmoothingQuality!==undefined) ctx.imageSmoothingQuality='high'; };
+  const buat=(w,h)=>{
+    const t=document.createElement('canvas'); t.width=w; t.height=h;
+    setKualitas(t.getContext('2d'));
+    t.getContext('2d').drawImage(cur,0,0,w,h);
+    return t;
+  };
+  let cur=sumber, cw=sw, ch=sh;
+  setKualitas(c);
+  // downscale bertahap: halve selama hasil masih >= target
+  while(cw>W*2 && ch>H*2 && cw>1){
+    const nw=Math.max(W,Math.round(cw/2)), nh=Math.max(H,Math.round(ch/2));
+    cur=buat(nw,nh); cw=cur.width; ch=cur.height;
+  }
+  // upscale bertahap: double selama masih < target
+  while(cw<W){
+    const nw=Math.min(W,cw*2), nh=Math.max(1,Math.round(nw*ch/cw));
+    cur=buat(nw,nh); cw=cur.width; ch=cur.height;
+  }
+  // pass final: gambar ke dimensi eksak di canvas utama
+  c.drawImage(cur,0,0,W,H);
+  return cur;
+}
+
 /* ---------- Bug #26: Kompresi gambar sesuai target ukuran file ----------
    Target <500 KB / <1 MB / atur sendiri. Strategi: turunkan kualitas JPEG
    dulu (binary search 0.3..0.95); kalau masih kebesaran & user izinkan,
@@ -1203,6 +1285,19 @@ async function prosesMeta(simpan){
       :'';
     const totalTags=Object.keys(z).length+Object.keys(ex).length+Object.keys(gp).length;
 
+    // Bug #27: info resize dimensi utk baris Resolusi (dari → ke, upscale/downscale)
+    const rsInfo=m.resizeInfo
+      ?` (resize ${m.resizeInfo.dariW}×${m.resizeInfo.dariH} → ${m.W}×${m.H}px, ${m.resizeInfo.arah} ${m.resizeInfo.faktor}×)`
+     :'';
+
+    // Bug #26: indikator jelas apakah kompresi benar-benar jalan atau tidak
+    const dikompres = targetKB>0 && (kompQ < JPEG_QUALITY - 0.001 || kompW!==origW || kompH!==origH);
+    const kompStatus = targetKB===0
+      ? 'kualitas penuh (tanpa batas)'
+      : (dikompres
+        ? `q=${kompQ.toFixed(2)}${(kompW!==origW||kompH!==origH)?`, downscale ${origW}×${origH}→${kompW}×${kompH}px`:''}`
+        : 'tidak perlu — file sudah di bawah target');
+
     setStatus(hasil.ok
       ?(simpan
         ?'✅ File diunduh. Metadata TERVERIFIKASI lengkap & tidak anomali.'
@@ -1214,8 +1309,8 @@ async function prosesMeta(simpan){
       (simpan?'── METADATA TERTANAM DI FILE ──':'── METADATA YANG AKAN DITANAM ──')+'\n'+
       `📷 Kamera      : ${mk} ${md}\n`+
       `🔧 Software    : ${sw}\n`+
-      `📐 Resolusi    : ${m.W}×${m.H}px  |  Orientasi: normal (1)\n`+
-      `💾 Ukuran file: ~${finalSizeKB} KB${targetLabel}  |  Kompresi: q=${kompQ.toFixed(2)}, ${(kompW!==origW||kompH!==origH)?`downscale ${origW}×${origH}→${kompW}×${kompH}px`:'dimensi penuh'}\n`+
+      `📐 Resolusi    : ${m.W}×${m.H}px${rsInfo}  |  Orientasi: normal (1)\n`+
+      `💾 Ukuran file: ~${finalSizeKB} KB${targetLabel}  |  Kompresi: ${kompStatus}\n`+
       `🎨 ColorSpace  : sRGB  |  ExifVersion: 2.30\n`+
       `⏰ Waktu foto  : ${m.w.Y}-${two(m.w.M)}-${two(m.w.D)} ${two(m.w.h)}:${two(m.w.mi)} ${m.w.zona}`+(offsetOk?` (${offsetStr(m.w.off)})`:'')+`\n`+
       `   (UTC untuk GPS: ${gp[piexif.GPSIFD.GPSDateStamp]} ${gp[piexif.GPSIFD.GPSTimeStamp].map(t=>String(t[0]/t[1]).padStart(2,'0')).join(':')})\n`+
@@ -1269,7 +1364,7 @@ const jadwal=()=>{
   clearTimeout(tmr);
   tmr=setTimeout(()=>{ exifNote=''; render(); },450);
 };
-['lat','lng','zoom','tgl','jam','tz','nama','alamat','note','make','model','alt','keepExif','keepImgDesc'].forEach(id=>{
+['lat','lng','zoom','tgl','jam','tz','nama','alamat','note','make','model','alt','keepExif','keepImgDesc','resizeMode','resizeCustom'].forEach(id=>{
   const el=$(id);
   if(!el) return;
   el.addEventListener('input',jadwal);

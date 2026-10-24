@@ -106,6 +106,10 @@
    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
    Pakai GPS perangkat
   </button>
+  <button type="button" class="sec" id="btnAcak" onclick="cariLokasiAcak()">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
+   Lokasi acak terdekat
+  </button>
  </div>
  <hr>
  <div class="row">
@@ -114,11 +118,21 @@
   <div><label for="zoom">Zoom peta</label>
    <select id="zoom"><option>13</option><option>14</option><option selected>15</option><option>16</option><option>17</option></select>
   </div>
+  <div><label for="radiusAcak">Radius acak</label>
+   <select id="radiusAcak">
+    <option value="50">± 50 m</option>
+    <option value="100" selected>± 100 m</option>
+    <option value="250">± 250 m</option>
+    <option value="500">± 500 m</option>
+    <option value="1000">± 1 km</option>
+   </select>
+  </div>
  </div>
+ <p class="hint">"Lokasi acak terdekat" membuat titik baru berjarak acak dari koordinat sekarang — lalu alamat otomatis dicari ulang supaya metadata tetap cocok. Berguna supaya setiap foto tidak berkoordinat persis sama.</p>
 </section>
 
 <section class="card" aria-labelledby="h-waktu">
- <h2 id="h-waktu">3 · Waktu</h2>
+ <h2 id="h-waktu">3 · Waktu &amp; Note</h2>
  <div class="row">
   <div><label for="tgl">Tanggal</label><input id="tgl" type="date"></div>
   <div><label for="jam">Jam</label><input id="jam" type="time"></div>
@@ -130,6 +144,9 @@
    </select>
   </div>
  </div>
+ <label for="note">Note kegiatan (tampil di bawah tanggal &amp; waktu)</label>
+ <input id="note" value="Created by cam-stempel-GPS" autocomplete="off" maxlength="90">
+ <p class="hint" style="margin-top:4px">Catatan kegiatan yang sedang dilakukan — tercetak sebagai baris terakhir stempel (di bawah tanggal &amp; waktu) dan ikut tertanam di metadata EXIF (UserComment). Contoh: “Penyaluran BLT”, “Kunjungan rumah penerima PKH”.</p>
 </section>
 
 <section class="card" aria-labelledby="h-kamera">
@@ -232,7 +249,13 @@ function dmsToDec(dms,ref){
   return d;
 }
 function ascii(s){
-  return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x20-\x7E]/g,'?');
+  return String(s)
+    .replace(/[\u2018\u2019]/g,"'")   // Bug #23: kutip tunggal tipografis → ASCII
+    .replace(/[\u201C\u201D]/g,'"')     // kutip ganda tipografis → ASCII
+    .replace(/[\u2013\u2014]/g,'-')     // en/em dash → tanda hubung
+    .replace(/\u2026/g,'...')           // ellipsis
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^\x20-\x7E]/g,'?');
 }
 
 /* ---------- Baca EXIF (ringkas untuk autofill form) ---------- */
@@ -342,6 +365,13 @@ $('foto').onchange=async e=>{
       if(zg[piexif.GPSIFD.GPSAltitudeRef]===1) a=-a;
       if(isFinite(a)) $('alt').value=a.toFixed(1);
     }
+    // Bug #23: auto-isi note dari UserComment EXIF asli (jika berisi teks)
+    const ze=fullExif['Exif']||{};
+    const ucAsli=ze[piexif.ExifIFD.UserComment];
+    if(typeof ucAsli==='string'&&ucAsli){
+      const bersih=ucAsli.replace(/^ASCII\u0000+/,'').replace(/^UNICODE\u0000+/,'').replace(/\u0000+$/,'').trim();
+      if(bersih) $('note').value=bersih;
+    }
     if(exifHasCamera) catatan.push('metadata kamera dipertahankan');
   }
 
@@ -380,35 +410,115 @@ function lokasiSaya(){
   }, {enableHighAccuracy:true, timeout:15000, maximumAge:0});
 }
 
+/* ---------- Bug #22: Pencarian bertingkat — fallback kalau alamat terlalu spesifik ---------- */
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+
+// Bangun daftar query dari paling spesifik -> paling umum
+// Contoh: "Jl. Pattimura, RT 02, Benteng, Sirimau, Ambon" gagal ->
+//         coba "RT 02, Benteng, Sirimau, Ambon" -> "Benteng, Sirimau, Ambon" -> dst.
+function bangunQueryPencarian(){
+  const nama=$('nama').value.trim();
+  const alamat=$('alamat').value.trim();
+  const list=[];
+  const push=q=>{ q=(q||'').replace(/\s+/g,' ').trim(); if(q.length>=4&&!list.includes(q)) list.push(q); };
+
+  if(nama&&alamat) push(nama+', '+alamat);
+  if(alamat) push(alamat);
+  if(nama) push(nama);
+  // Strip bagian depan alamat satu per satu (jalan biasanya membuat pencarian gagal)
+  if(alamat){
+    const bagian=alamat.split(',').map(p=>p.trim()).filter(Boolean);
+    for(let i=1;i<bagian.length;i++) push(bagian.slice(i).join(', '));
+  }
+  // Ambil kota dari title "Kota, Provinsi, Indonesia"
+  if(nama){
+    const kota=nama.split(',')[0].trim();
+    if(kota) push(kota+', Indonesia');
+  }
+  // Batasi maksimal 6 query agar tidak spam Nominatim
+  return list.slice(0,6);
+}
+
 async function cariKoordinat(){
-  const query=$('nama').value.trim()+', '+$('alamat').value.trim();
-  if(query.length<5){ alert('Isi nama tempat dan alamat detail dengan jelas.'); return; }
   const btn=$('btnCari'); btn.disabled=true;
   const btnR=$('btnReverse'); if(btnR) btnR.disabled=true;
-  setStatus('⏳ Mencari koordinat & alamat lengkap...');
-  try{
-    const res=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&accept-language=id&q=${encodeURIComponent(query)}`);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const data=await res.json();
-    if(data&&data.length>0){
-      const item=data[0];
-      $('lat').value=parseFloat(item.lat).toFixed(6);
-      $('lng').value=parseFloat(item.lon).toFixed(6);
-      // Bug #20: format alamat dari structured Nominatim response
-      const fmt=formatAlamat(item.address, item.display_name);
-      if(fmt.title) $('nama').value=fmt.title;
-      if(fmt.alamat) $('alamat').value=fmt.alamat;
-      exifNote=' (koordinat & alamat dari pencarian OpenStreetMap)';
-      setStatus('✅ Koordinat & alamat lengkap ditemukan!');
-      if(img) render();
-    }else{
-      setStatus('⚠️ Alamat tidak spesifik, koordinat tidak ditemukan.');
-      alert('Koordinat tidak ditemukan. Coba gunakan nama kecamatan atau kota.');
-    }
-  }catch(err){
-    setStatus('⚠️ Gagal mencari koordinat ('+err.message+'). Periksa koneksi atau coba lagi sebentar lagi.');
+  const btnA=$('btnAcak'); if(btnA) btnA.disabled=true;
+  const queries=bangunQueryPencarian();
+
+  if(queries.length===0){
+    alert('Isi nama tempat dan alamat detail dengan jelas.');
+    btn.disabled=false; if(btnR)btnR.disabled=false; if(btnA)btnA.disabled=false;
+    return;
   }
-  setTimeout(()=>{btn.disabled=false; if(btnR) btnR.disabled=false;},1100);
+
+  let lastErr=null, found=null, usedQuery='';
+  for(let i=0;i<queries.length;i++){
+    const q=queries[i];
+    setStatus(`⏳ Mencari lokasi (${i+1}/${queries.length}): "${q}"...`);
+    try{
+      const res=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&accept-language=id&q=${encodeURIComponent(q)}`);
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      const data=await res.json();
+      if(data&&data.length>0){ found=data[0]; usedQuery=q; break; }
+    }catch(err){ lastErr=err; }
+    if(i<queries.length-1) await delay(1150);   // hormati batas 1 request/detik Nominatim
+  }
+
+  if(found){
+    $('lat').value=parseFloat(found.lat).toFixed(6);
+    $('lng').value=parseFloat(found.lon).toFixed(6);
+    const fmt=formatAlamat(found.address, found.display_name);
+    if(fmt.title) $('nama').value=fmt.title;
+    if(fmt.alamat) $('alamat').value=fmt.alamat;
+    exifNote=' (lokasi via: "'+usedQuery+'")';
+    setStatus('✅ Lokasi ditemukan lewat pencarian: "'+usedQuery+'". Gunakan "Lokasi acak terdekat" untuk variasi titik.');
+    if(img) render();
+  }else{
+    const msg=lastErr
+      ?'⚠️ Gagal menghubungi server pencarian ('+lastErr.message+'). Periksa koneksi internet.'
+      :'⚠️ Lokasi tidak ditemukan untuk semua variasi alamat.';
+    setStatus(msg);
+    alert(lastErr
+      ?'Gagal menghubungi server pencarian lokasi.\n\nPeriksa koneksi internet Anda, lalu coba lagi.'
+      :'Lokasi tidak ditemukan setelah beberapa variasi pencarian.\n\nTips:\n• Gunakan format: jalan, kelurahan, kecamatan, kota\n• Atau cukup: "Sirimau, Ambon" (kecamatan, kota)\n• Contoh: "Benteng, Sirimau, Ambon"');
+  }
+  setTimeout(()=>{btn.disabled=false; if(btnR)btnR.disabled=false; if(btnA)btnA.disabled=false;},1100);
+}
+
+/* ---------- Bug #22: Lokasi acak terdekat — offset dari koordinat saat ini ---------- */
+// Generate titik acak berjarak minM..maxM meter dari (lat,lng) dengan arah acak
+function offsetAcak(lat,lng,minM,maxM){
+  const R=6378137;                                   // radius bumi (meter)
+  const dist=minM+Math.random()*(maxM-minM);         // jarak acak
+  const brg=Math.random()*Math.PI*2;                 // arah/bearing acak 0-360°
+  const dLat=dist*Math.cos(brg)/R*(180/Math.PI);
+  const cosLat=Math.max(1e-9,Math.cos(lat*Math.PI/180));   // guard: hindari bagi nol di kutub
+  const dLng=dist*Math.sin(brg)/(R*cosLat)*(180/Math.PI);
+  let nLat=lat+dLat, nLng=lng+dLng;
+  if(nLat>90)nLat=90; if(nLat<-90)nLat=-90;          // clamp latitude
+  nLng=((nLng+540)%360)-180;                         // wrap longitude ke [-180,180]
+  return {lat:nLat, lng:nLng};
+}
+
+async function cariLokasiAcak(){
+  const k=ambilKoordinat();
+  if(k.err){ alert(k.err); return; }
+  const btn=$('btnAcak'); if(btn) btn.disabled=true;
+  const radius=parseInt($('radiusAcak').value,10)||100;
+  const minM=Math.max(5,Math.round(radius*0.2));     // minimal 20% dari radius supaya benar-benar berpindah
+  const maxM=radius;
+  const baru=offsetAcak(k.lat,k.lng,minM,maxM);
+
+  $('lat').value=baru.lat.toFixed(6);
+  $('lng').value=baru.lng.toFixed(6);
+  exifNote=` (titik acak ${minM}\u2013${maxM} m dari koordinat sebelumnya)`;
+  setStatus(`🎲 Titik acak dibuat (${minM}\u2013${maxM} m). Mencari alamat terdekat...`);
+  if(img) render();
+
+  // Reverse-geocode supaya alamat & metadata cocok dengan koordinat acak baru
+  await delay(400);
+  await cariAlamat();
+  if(btn) btn.disabled=false;
 }
 
 // Bug #20: Reverse geocode — dari koordinat ke alamat lengkap (Nominatim)
@@ -623,11 +733,14 @@ async function render(){
   const W=Math.round(iw*scale), H=Math.round(ih*scale);
 
   const f1=W*.037, f2=W*.020, f3=W*.0225, pad=W*.011, padX=W*.014;
-  const tot=f1*1.16+(f2+f3*2)*1.36+pad*2;
-  const stripH=Math.round(Math.min(Math.max(tot,W*.13),W*.20));
-  const y0=H-stripH, mapW=Math.round(stripH);
 
   const judul=$('nama').value.trim(), alamat=$('alamat').value.trim();
+  const note=$('note').value.trim();                              // Bug #23: note kegiatan
+
+  // Bug #23: tinggi strip bertambah 1 baris jika note diisi
+  const tot=f1*1.16+(f2+f3*(note?3:2))*1.36+pad*2;
+  const stripH=Math.round(Math.min(Math.max(tot,W*.13),W*.20));
+  const y0=H-stripH, mapW=Math.round(stripH);
   const koord=`Lat ${k.lat.toFixed(6)}, Long ${k.lng.toFixed(6)}`;
   const hari=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][new Date(w.Y,w.M-1,w.D).getDay()];
   const waktu=`${hari}, ${two(w.D)}/${two(w.M)}/${w.Y} ${w.h%12||12}:${two(w.mi)} ${w.h>=12?'PM':'AM'} ${w.zona}`;
@@ -669,6 +782,8 @@ async function render(){
   tulis(c,alamat,tx,y,maxW,f2,'#d9d9d9'); y+=f2*1.36;
   tulis(c,koord,tx,y,maxW,f3,'#fff');     y+=f3*1.36;
   tulis(c,waktu,tx,y,maxW,f3,'#fff');
+  // Bug #23: note kegiatan — baris terakhir, di bawah tanggal & waktu
+  if(note){ y+=f3*1.36; tulis(c,note,tx,y,maxW,f3*.92,'#c3cfdd'); }
 
   const bh=stripH*.22, bw=bh*2.55, mg=W*.008;
   const bx=W-bw-mg, by=y0-bh*.30;
@@ -681,6 +796,7 @@ async function render(){
   lastMeta={
     lat:k.lat, lng:k.lng,
     judul, alamat,
+    note,
     w,
     W, H,
     make:$('make').value.trim()||'samsung',
@@ -714,7 +830,7 @@ function simpanBlob(blob,nama){
 
 /* ---------- Bug #13-#19: Bangun EXIF dengan metadata lengkap & natural ---------- */
 function bangunExif(m,withOffset){
-  const {w,judul,alamat,lat,lng,make,model,altitude,keepExif,keepImgDesc,origExif,W,H}=m;
+  const {w,judul,alamat,note,lat,lng,make,model,altitude,keepExif,keepImgDesc,origExif,W,H}=m;
   const dt=`${w.Y}:${two(w.M)}:${two(w.D)} ${two(w.h)}:${two(w.mi)}:00`;
 
   const utc=new Date(Date.UTC(w.Y,w.M-1,w.D,w.h-w.off,w.mi,0));
@@ -749,6 +865,15 @@ function bangunExif(m,withOffset){
   if(withOffset){                                                       // Bug #7: OffsetTime*
     const o=offsetStr(w.off);
     exif[0x9010]=o; exif[0x9011]=o; exif[0x9012]=o;
+  }
+
+  // Bug #23: Note kegiatan → UserComment. Prefix "ASCII\0\0\0" (8 byte) sesuai
+  // standar EXIF — cara yang sama seperti kamera Samsung asli menulis UserComment,
+  // sehingga reader standar (ExifTool/PIL/Windows) membacanya bersih tanpa anomali.
+  if(note){
+    exif[piexif.ExifIFD.UserComment]='ASCII\u0000\u0000\u0000'+ascii(note);
+  }else{
+    delete exif[piexif.ExifIFD.UserComment];
   }
 
   // Bug #17: tag kamera standar jika tidak ada di EXIF asli (supaya natural)
@@ -828,7 +953,10 @@ function verifikasi(newJpeg,m){
       colorSpace: e[piexif.ExifIFD.ColorSpace]!==undefined,
       pixelW: e[piexif.ExifIFD.PixelXDimension]===m.W,
       pixelH: e[piexif.ExifIFD.PixelYDimension]===m.H,
-      orientation: z[piexif.ImageIFD.Orientation]===1
+      orientation: z[piexif.ImageIFD.Orientation]===1,
+      // Bug #23: UserComment wajib memuat note (jika note diisi)
+      userComment: !m.note || (typeof e[piexif.ExifIFD.UserComment]==='string'
+                   && e[piexif.ExifIFD.UserComment].indexOf(ascii(m.note))!==-1)
     };
     const failed=Object.keys(checks).filter(k=>!checks[k]);
     if(failed.length){
@@ -873,6 +1001,11 @@ function unduh(){
     const iso=ex[piexif.ExifIFD.ISOSpeedRatings]||'-';
     const fl=ex[piexif.ExifIFD.FocalLength];
     const flStr=fl?`${(fl[0]/fl[1]).toFixed(1)}mm`:'-';
+    // Bug #23: baca balik UserComment (strip prefix 8-byte untuk ditampilkan)
+    const ucRaw=ex[piexif.ExifIFD.UserComment];
+    const ucTampil=(typeof ucRaw==='string'&&ucRaw)
+      ?ucRaw.replace(/^ASCII\u0000+/,'').replace(/^UNICODE\u0000+/,'').replace(/\u0000+$/,'').trim()
+      :'';
     const totalTags=Object.keys(z).length+Object.keys(ex).length+Object.keys(gp).length;
 
     setStatus(hasil.ok
@@ -893,6 +1026,7 @@ function unduh(){
       `⚙️  Exposure   : ${expStr}  |  Aperture: ${fnStr}  |  ISO: ${iso}  |  Focal: ${flStr}\n`+
       `💡 Flash       : ${ex[piexif.ExifIFD.Flash]===0?'Tidak menyala':'Menyala'}  |  WhiteBalance: ${ex[piexif.ExifIFD.WhiteBalance]===0?'Auto':'Manual'}\n`+
       `📝 Deskripsi   : ${ascii(m.judul+' - '+m.alamat)}\n`+
+      `🗒️  Note       : ${ucTampil?'"'+ucTampil+'" (UserComment)':'(tidak ada)'}\n`+
       `✅ Total tags  : ${totalTags} (${Object.keys(z).length} IFD0, ${Object.keys(ex).length} Exif, ${Object.keys(gp).length} GPS)\n`+
       `────────────────────────────────\n`+
       (hasil.ok?'✅ Verifikasi: LULUS (lat, lng, waktu, kamera, altitude, exposure semua cocok)':'⚠️ Verifikasi: '+hasil.failed.join(', '));
@@ -911,7 +1045,7 @@ const jadwal=()=>{
   clearTimeout(tmr);
   tmr=setTimeout(()=>{ exifNote=''; render(); },450);
 };
-['lat','lng','zoom','tgl','jam','tz','nama','alamat','make','model','alt','keepExif','keepImgDesc'].forEach(id=>{
+['lat','lng','zoom','tgl','jam','tz','nama','alamat','note','make','model','alt','keepExif','keepImgDesc'].forEach(id=>{
   const el=$(id);
   if(!el) return;
   el.addEventListener('input',jadwal);

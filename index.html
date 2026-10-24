@@ -164,6 +164,27 @@
 
 <section class="card" aria-labelledby="h-hasil">
  <h2 id="h-hasil">5 · Hasil</h2>
+ <div class="row" style="margin-top:4px">
+  <div><label for="ukuranMode">Target ukuran file</label>
+   <select id="ukuranMode" onchange="toggleUkuranCustom()">
+    <option value="500">&lt; 500 KB</option>
+    <option value="1000" selected>&lt; 1 MB</option>
+    <option value="custom">Atur sendiri</option>
+    <option value="0">Tanpa batas (kualitas penuh)</option>
+   </select>
+  </div>
+  <div id="ukuranCustomWrap" style="display:none">
+   <label for="ukuranCustom">Maksimum (KB)</label>
+   <input id="ukuranCustom" type="number" min="50" max="20000" step="50" value="750" inputmode="numeric">
+  </div>
+  <div><label for="bolehDownscale">Kecilkan dimensi?</label>
+   <select id="bolehDownscale">
+    <option value="1" selected>Boleh (jika perlu)</option>
+    <option value="0">Pertahankan dimensi asli</option>
+   </select>
+  </div>
+ </div>
+ <p class="hint" style="margin-top:8px">Saat klik <b>"Buat geotag"</b>, foto dikompresi otomatis (kualitas JPEG diturunkan dulu; kalau masih kebesaran &amp; "Kecilkan dimensi" = Boleh, dimensi dikecilkan) sampai di bawah target. Pilih <b>"Tanpa batas"</b> utk kualitas penuh tanpa kompresi.</p>
  <div class="actions" style="margin-top:8px">
   <button type="button" id="btnBuat" onclick="buatGeotag()">
    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -174,7 +195,7 @@
    Download JPG + EXIF
   </button>
  </div>
- <p class="hint" style="margin-top:8px">Klik <b>"Buat geotag"</b> untuk menerapkan & mempratinjau metadata sesuai form saat ini (alamat, koordinat, tanggal-jam, note, kamera) — panel di bawah menampilkan metadata yang akan tertanam. Setelah cocok, klik <b>"Download JPG + EXIF"</b> untuk menyimpan.</p>
+ <p class="hint" style="margin-top:8px">Klik <b>"Buat geotag"</b> untuk menerapkan & mempratinjau metadata sesuai form saat ini (alamat, koordinat, tanggal-jam, note, kamera) — panel di bawah menampilkan metadata yang akan tertanam <i>termasuk ukuran file hasil kompresi</i>. Setelah cocok, klik <b>"Download JPG + EXIF"</b> untuk menyimpan.</p>
  <span id="st" role="status" aria-live="polite"></span>
  <div id="meta"></div>
 </section>
@@ -1068,6 +1089,79 @@ function verifikasi(newJpeg,m){
   }catch(err){ return {ok:false,error:err.message}; }
 }
 
+/* ---------- Bug #26: Kompresi gambar sesuai target ukuran file ----------
+   Target <500 KB / <1 MB / atur sendiri. Strategi: turunkan kualitas JPEG
+   dulu (binary search 0.3..0.95); kalau masih kebesaran & user izinkan,
+   kecilkan dimensi (binary search skala 0.2..1.0). Budget canvas = target -
+   overhead EXIF supaya file akhir (JPEG + EXIF) tetap di bawah target. ---------- */
+// Estimasi panjang byte JPEG dari data URL base64
+function ukuranBytes(dataUrl){
+  const i=dataUrl.indexOf(','); if(i<0) return 0;
+  const b64=dataUrl.substring(i+1);
+  const pad=b64.endsWith('==')?2:(b64.endsWith('=')?1:0);
+  return Math.floor(b64.length*3/4)-pad;
+}
+// Baca target ukuran dari UI (KB). 0 = tanpa batas.
+function ambilTargetKB(){
+  const mode=$('ukuranMode')?$('ukuranMode').value:'1000';
+  if(mode==='0') return 0;
+  if(mode==='custom'){
+    const v=parseInt(String($('ukuranCustom')?$('ukuranCustom').value:'').trim(),10);
+    if(isFinite(v)&&v>=50) return v;
+    return 750;
+  }
+  const v=parseInt(mode,10); return isFinite(v)&&v>0?v:1000;
+}
+// Tampil/sembunyi input "atur sendiri"
+function toggleUkuranCustom(){
+  const w=$('ukuranCustomWrap'); if(!w) return;
+  w.style.display=($('ukuranMode').value==='custom')?'block':'none';
+}
+// Binary search kualitas JPEG [lo..hi] dgn callback measure(q)->{size,dataUrl}.
+// Kembalikan {q,sizeBytes,dataUrl,met} — q tertinggi yg <= budget, atau yg terkecil.
+function binSearchKualitas(measure, budgetBytes, lo, hi, iter){
+  lo=(lo===undefined)?0.3:lo; hi=(hi===undefined)?0.95:hi; iter=(iter===undefined)?6:iter;
+  let best=null, smallest=null;
+  let r=measure(hi);
+  if(r.size<=budgetBytes) return {q:hi, sizeBytes:r.size, dataUrl:r.dataUrl, met:'quality'};
+  smallest={q:hi, sizeBytes:r.size, dataUrl:r.dataUrl};
+  for(let i=0;i<iter;i++){
+    const mid=(lo+hi)/2;
+    r=measure(mid);
+    if(!smallest||r.size<smallest.sizeBytes) smallest={q:mid, sizeBytes:r.size, dataUrl:r.dataUrl};
+    if(r.size<=budgetBytes){ lo=mid; best={q:mid, sizeBytes:r.size, dataUrl:r.dataUrl, met:'quality'}; }
+    else hi=mid;
+  }
+  return best||Object.assign(smallest,{met:'floor'});
+}
+// Kompresi sebuah canvas ke <= budgetBytes. Kembalikan {dataUrl,q,w,h,sizeBytes,met}.
+function kompresiCanvas(canvas, budgetBytes){
+  const measure=q=>{ const d=canvas.toDataURL('image/jpeg',q); return {size:ukuranBytes(d), dataUrl:d}; };
+  const r=binSearchKualitas(measure, budgetBytes);
+  return {dataUrl:r.dataUrl, q:r.q, w:canvas.width, h:canvas.height, sizeBytes:r.sizeBytes, met:r.met||'quality'};
+}
+// Kompresi canvas utama (cv) ke <= budgetBytes; turunkan kualitas dulu,
+// kalau tidak cukup & allowDownscale -> kecilkan dimensi (binary search skala).
+function kompresiJPEG(budgetBytes, allowDownscale){
+  const srcW=cv.width, srcH=cv.height;
+  let r=kompresiCanvas(cv, budgetBytes);
+  if(r.sizeBytes<=budgetBytes) return r;
+  if(!allowDownscale) return r;
+  // Binary search skala [0.2..1.0]; cari skala TERBESAR yg masih <= budget.
+  let loS=0.2, hiS=1.0, bestFallback=r;
+  for(let i=0;i<5;i++){
+    const midS=(loS+hiS)/2;
+    const nw=Math.max(320,Math.round(srcW*midS));
+    const nh=Math.max(240,Math.round(srcH*midS));
+    const off=document.createElement('canvas'); off.width=nw; off.height=nh;
+    off.getContext('2d').drawImage(cv,0,0,nw,nh);
+    const rc=kompresiCanvas(off, budgetBytes);
+    if(rc.sizeBytes<=budgetBytes){ loS=midS; r={dataUrl:rc.dataUrl,q:rc.q,w:nw,h:nh,sizeBytes:rc.sizeBytes,met:'downscale'}; }
+    else{ hiS=midS; if(rc.sizeBytes<bestFallback.sizeBytes) bestFallback={dataUrl:rc.dataUrl,q:rc.q,w:nw,h:nh,sizeBytes:rc.sizeBytes,met:'downscale-floor'}; }
+  }
+  return r.sizeBytes<=budgetBytes ? r : bestFallback;
+}
+
 /* ---------- Bug #25: "Buat geotag" = pratinjau metadata sebelum download ----------
    Dipecah jadi prosesMeta(simpan) supaya tombol "Buat geotag" bisa menampilkan
    metadata yang akan tertanam SEBELUM disimpan — user bisa verifikasi & sesuaikan dulu. ---------- */
@@ -1076,14 +1170,33 @@ async function prosesMeta(simpan){
   if(metaSibuk) return false;
   metaSibuk=true;
   $('btnDl').disabled=true;
-  const m=lastMeta;
-  const jpegData=cv.toDataURL('image/jpeg',JPEG_QUALITY);
+  const m={...lastMeta};
+  const origW=lastMeta.W, origH=lastMeta.H;
   try{
     let bytes,offsetOk=true;
     try{ bytes=bangunExif(m,true); }
     catch(e){ offsetOk=false; bytes=bangunExif(m,false); }
 
+    // Bug #26: kompresi gambar sesuai target ukuran file (500 KB / 1 MB / atur sendiri)
+    const targetKB=ambilTargetKB();
+    const allowDownscale=($('bolehDownscale')&&$('bolehDownscale').value==='1');
+    let jpegData, kompQ=JPEG_QUALITY, kompW=m.W, kompH=m.H, targetLabel='';
+    if(targetKB>0){
+      const budget=Math.max(8192, targetKB*1024 - (bytes.length+16));   // sisa utk canvas setelah EXIF
+      const komp=kompresiJPEG(budget, allowDownscale);
+      jpegData=komp.dataUrl; kompQ=komp.q; kompW=komp.w; kompH=komp.h;
+      targetLabel=` (target ≤ ${targetKB} KB)`;
+    }else{
+      jpegData=cv.toDataURL('image/jpeg',JPEG_QUALITY);
+      targetLabel=' (tanpa batas, kualitas penuh)';
+    }
+    // Kalau di-downscale, update dimensi EXIF supaya PixelXDimension cocok dgn gambar aktual
+    if(kompW!==origW||kompH!==origH){
+      m.W=kompW; m.H=kompH;
+      try{ bytes=bangunExif(m,true); }catch(e){ offsetOk=false; bytes=bangunExif(m,false); }
+    }
     const newJpeg=piexif.insert(bytes,jpegData);
+    const finalSizeKB=Math.round(ukuranBytes(newJpeg)/1024);
     const hasil=verifikasi(newJpeg,m);
     if(simpan){
       const nama=`Geotag_${m.w.Y}-${two(m.w.M)}-${two(m.w.D)}_${two(m.w.h)}${two(m.w.mi)}.jpg`;
@@ -1127,6 +1240,7 @@ async function prosesMeta(simpan){
       `📷 Kamera      : ${mk} ${md}\n`+
       `🔧 Software    : ${sw}\n`+
       `📐 Resolusi    : ${m.W}×${m.H}px  |  Orientasi: normal (1)\n`+
+      `💾 Ukuran file: ~${finalSizeKB} KB${targetLabel}  |  Kompresi: q=${kompQ.toFixed(2)}, ${(kompW!==origW||kompH!==origH)?`downscale ${origW}×${origH}→${kompW}×${kompH}px`:'dimensi penuh'}\n`+
       `🎨 ColorSpace  : sRGB  |  ExifVersion: 2.30\n`+
       `⏰ Waktu foto  : ${m.w.Y}-${two(m.w.M)}-${two(m.w.D)} ${two(m.w.h)}:${two(m.w.mi)} ${m.w.zona}`+(offsetOk?` (${offsetStr(m.w.off)})`:'')+`\n`+
       `   (UTC untuk GPS: ${gp[piexif.GPSIFD.GPSDateStamp]} ${gp[piexif.GPSIFD.GPSTimeStamp].map(t=>String(t[0]/t[1]).padStart(2,'0')).join(':')})\n`+

@@ -138,9 +138,9 @@
    </select>
   </div>
  </div>
- <label for="note">Note kegiatan (tampil di bawah tanggal &amp; waktu)</label>
+ <label for="note">Note kegiatan (tampil di bawah tanggal &amp; waktu pada foto)</label>
  <input id="note" value="Created by cam-stempel-GPS" autocomplete="off" maxlength="90">
- <p class="hint" style="margin-top:4px">Catatan kegiatan yang sedang dilakukan — tercetak sebagai baris terakhir stempel (di bawah tanggal &amp; waktu) dan ikut tertanam di metadata EXIF (UserComment). Contoh: “Penyaluran BLT”, “Kunjungan rumah penerima PKH”.</p>
+ <p class="hint" style="margin-top:4px">Catatan singkat kegiatan — akan tampil sebagai baris terakhir di stempel foto dan tersimpan di EXIF UserComment. Default: "Created by cam-stempel-GPS".</p>
 </section>
 
 <section class="card" aria-labelledby="h-kamera">
@@ -195,7 +195,7 @@
    Download JPG + EXIF
   </button>
  </div>
- <p class="hint" style="margin-top:8px">Klik <b>"Buat geotag"</b> untuk menerapkan & mempratinjau metadata sesuai form saat ini (alamat, koordinat, tanggal-jam, note, kamera) — panel di bawah menampilkan metadata yang akan tertanam <i>termasuk ukuran file hasil kompresi</i>. Setelah cocok, klik <b>"Download JPG + EXIF"</b> untuk menyimpan.</p>
+ <p class="hint" style="margin-top:8px">Klik <b>"Buat geotag"</b> untuk menerapkan &amp; mempratinjau metadata sesuai form saat ini (alamat, koordinat, tanggal-jam, note, kamera) — panel di bawah menampilkan metadata yang akan tertanam <i>termasuk ukuran file hasil kompresi</i>. Setelah cocok, klik <b>"Download JPG + EXIF"</b> untuk menyimpan.</p>
  <span id="st" role="status" aria-live="polite"></span>
  <div id="meta"></div>
 </section>
@@ -273,9 +273,9 @@ function dmsToDec(dms,ref){
 }
 function ascii(s){
   return String(s)
-    .replace(/[\u2018\u2019]/g,"'")   // Bug #23: kutip tunggal tipografis → ASCII
-    .replace(/[\u201C\u201D]/g,'"')     // kutip ganda tipografis → ASCII
-    .replace(/[\u2013\u2014]/g,'-')     // en/em dash → tanda hubung
+    .replace(/[\u2018\u2019]/g,"'")   // Bug #23: kutip tunggal tipografis -> ASCII
+    .replace(/[\u201C\u201D]/g,'"')     // kutip ganda tipografis -> ASCII
+    .replace(/[\u2013\u2014]/g,'-')     // en/em dash -> tanda hubung
     .replace(/\u2026/g,'...')           // ellipsis
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
     .replace(/[^\x20-\x7E]/g,'?');
@@ -388,14 +388,14 @@ $('foto').onchange=async e=>{
       if(zg[piexif.GPSIFD.GPSAltitudeRef]===1) a=-a;
       if(isFinite(a)) $('alt').value=a.toFixed(1);
     }
-    // Bug #23: auto-isi note dari UserComment EXIF asli (jika berisi teks)
-    const ze=fullExif['Exif']||{};
-    const ucAsli=ze[piexif.ExifIFD.UserComment];
-    if(typeof ucAsli==='string'&&ucAsli){
-      const bersih=ucAsli.replace(/^ASCII\u0000+/,'').replace(/^UNICODE\u0000+/,'').replace(/\u0000+$/,'').trim();
-      if(bersih) $('note').value=bersih;
-    }
     if(exifHasCamera) catatan.push('metadata kamera dipertahankan');
+    // Bug #23: auto-isi note dari UserComment EXIF asli (prefix ASCII/UNICODE di-strip)
+    const ex0=fullExif['Exif']||{};
+    const ucRaw=ex0[piexif.ExifIFD.UserComment];
+    if(typeof ucRaw==='string'&&ucRaw){
+      const uc=ucRaw.replace(/^ASCII\u0000+/,'').replace(/^UNICODE\u0000+/,'').replace(/\u0000+$/,'').trim();
+      if(uc) $('note').value=uc;
+    }
   }
 
   // Bug #19: tampilkan peringatan jika metadata kamera tidak ada
@@ -409,11 +409,8 @@ $('foto').onchange=async e=>{
 
   exifNote=' ('+catatan.join('; ')+')';
   render();
-  
-  // Bug #20: Auto reverse-geocode alamat dari koordinat EXIF (asynchronous)
-  if(info&&info.lat!==undefined){
-    setTimeout(()=>cariAlamat(), 300);
-  }
+  // Bug #20: auto reverse-geocode supaya alamat terisi lengkap & cocok metadata
+  if(info&&info.lat!==undefined) setTimeout(()=>cariAlamat(),300);
 };
 
 function lokasiSaya(){
@@ -437,8 +434,6 @@ function lokasiSaya(){
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 
 // Bangun daftar query dari paling spesifik -> paling umum
-// Contoh: "Jl. Pattimura, RT 02, Benteng, Sirimau, Ambon" gagal ->
-//         coba "RT 02, Benteng, Sirimau, Ambon" -> "Benteng, Sirimau, Ambon" -> dst.
 function bangunQueryPencarian(){
   const nama=$('nama').value.trim();
   const alamat=$('alamat').value.trim();
@@ -527,7 +522,8 @@ async function cariKoordinat(){
   setTimeout(()=>{btn.disabled=false; if(btnR)btnR.disabled=false; if(btnA)btnA.disabled=false;},1100);
 }
 
-/* ---------- Bug #22: Lokasi acak terdekat — offset dari koordinat saat ini ---------- */
+/* ---------- Bug #22 + #24 + #25: Lokasi acak — radius tetap 100–200 m dari titik alamat,
+   dikunci di kecamatan yang sama (diverifikasi online via reverse-geocode) ---------- */
 // Generate titik acak berjarak minM..maxM meter dari (lat,lng) dengan arah acak
 function offsetAcak(lat,lng,minM,maxM){
   const R=6378137;                                   // radius bumi (meter)
@@ -542,8 +538,6 @@ function offsetAcak(lat,lng,minM,maxM){
   return {lat:nLat, lng:nLng};
 }
 
-/* ---------- Bug #22 + #24 + #25: Lokasi acak — radius tetap 100–200 m dari titik alamat,
-   dikunci di kecamatan yang sama (diverifikasi online via reverse-geocode) ---------- */
 async function cariLokasiAcak(){
   const k=ambilKoordinat();
   if(k.err){ alert(k.err); return; }
@@ -698,16 +692,16 @@ function formatAlamat(addr, displayName){
   }
 
   // Helper: ambil field pertama yang ada dari daftar
-  const pick=o=>(f)=>{ for(const k of f){ if(o[k]) return o[k]; } return ''; };
+  const pick=o=>(f)=>{ for(const k of f){ if(o[k]) return o[k]; } return '' };
 
   const road = pick(addr)(['road','pedestrian','footway','path','cycleway','construction','residential']);
   const houseNo = addr.house_number||'';
   const lorong = pick(addr)(['neighbourhood','hamlet','allotments','quarter']);
-  // Kelurahan: suburb (印尼 Nominatim field untuk kelurahan/desa urban)
+  // Kelurahan: suburb (Nominatim field utk kelurahan/desa urban)
   const kelurahan = pick(addr)(['suburb','borough','subdistrict','village_subdivision']);
-  // Kecamatan: city_district (印尼 field untuk kecamatan); fallback county (yang kadang juga kecamatan)
+  // Kecamatan: city_district (field utk kecamatan); fallback county (kadang juga kecamatan)
   const kecamatan = ambilKecamatan(addr);
-  // Kota: city/town/municipality/village (village untuk desa di Jawa/pedesaan)
+  // Kota: city/town/municipality/village (village utk desa di Jawa/pedesaan)
   const kota = pick(addr)(['city','town','municipality','village']);
   // Kabupaten: county (jika berbeda dari kecamatan)
   const kabupaten = (addr.county && addr.county!==kecamatan) ? addr.county : '';
@@ -798,45 +792,29 @@ function tulis(c,t,x,y,maxW,fs,warna,bold=''){
  while(c.measureText(t).width>maxW&&s>fs*.45){ s*=.95; c.font=`${bold} ${s}px Arial`; }
  c.fillStyle=warna;c.fillText(t,x,y);}
 
-/* ---------- Bug #21: Gambar peta dengan perspektif 3D (trapesium) ---------- */
+/* ---------- Bug #21: Gambar peta dengan perspektif 3D (trapesium 24-slice) ---------- */
 function draw3DMap(c, srcCanvas, sx, sy, sw, sh, dx, dy, dw, dh, persp){
-  persp = Math.max(0, Math.min(0.6, persp||0.32));
-  const slices=24, sliceH=dh/slices;
-  for(let i=0;i<slices;i++){
-    const t0=i/slices, t1=(i+1)/slices;
-    // Lebar di y=t: top (t=0) lebih sempit, bottom (t=1) penuh
-    const wFracTop=1-persp*(1-t0), wFracBot=1-persp*(1-t1);
-    const wTop=dw*wFracTop, wBot=dw*wFracBot;
-    const xOffTop=(dw-wTop)/2, xOffBot=(dw-wBot)/2;
-    const xTop=dx+xOffTop, xBot=dx+xOffBot;
-    const yTop=dy+i*sliceH, yBot=dy+(i+1)*sliceH;
-    const sy0=sy+t0*sh, sy1=sy+t1*sh;
+  const N=24;
+  for(let i=0;i<N;i++){
+    const f0=i/N, f1=(i+1)/N;
+    // Lebar fraksi: sempit di atas (jauh), lebar di bawah (dekat) — persp=penyempitan puncak
+    const wf0=1-persp*(1-f0), wf1=1-persp*(1-f1);
+    const wTop=dw*wf0, wBot=dw*wf1;
+    const xTop=dx+(dw-wTop)/2, xBot=dx+(dw-wBot)/2;
+    const yTop=dy+f0*dh, yBot=dy+f1*dh;
     c.save();
-    // Klip ke trapesium
     c.beginPath();
-    c.moveTo(xTop,yTop);
-    c.lineTo(xTop+wTop,yTop);
-    c.lineTo(xBot+wBot,yBot);
-    c.lineTo(xBot,yBot);
-    c.closePath();
+    c.moveTo(xTop,yTop); c.lineTo(xBot,yBot); c.lineTo(xBot+wBot,yBot); c.lineTo(xTop+wTop,yTop); c.closePath();
     c.clip();
-    // Stretch ke bounding box (pakai lebar maksimum supaya tidak ada gap)
-    const drawW=Math.max(wTop,wBot);
-    const drawX=dx+(dw-drawW)/2;
-    c.drawImage(srcCanvas, sx, sy0, sw, Math.max(1, sy1-sy0+1), drawX, yTop, drawW, sliceH+1);
+    // Gambar strip sumber (sw × sh/N) ke rect terluas trapesium
+    const wmax=Math.max(wTop,wBot);
+    c.drawImage(srcCanvas, sx, sy+f0*sh, sw, sh/N, Math.min(xTop,xBot), yTop, wmax, yBot-yTop);
     c.restore();
   }
-  // Gradient bayangan di atas (horizon effect)
-  const g1=c.createLinearGradient(0,dy,0,dy+dh*0.45);
-  g1.addColorStop(0,'rgba(0,0,0,.45)'); g1.addColorStop(1,'rgba(0,0,0,0)');
-  c.fillStyle=g1; c.fillRect(dx,dy,dw,dh*0.45);
-  // Gradient gelap di bawah (efek kedalaman / dekat ke viewer)
-  const g2=c.createLinearGradient(0,dy+dh*0.6,0,dy+dh);
-  g2.addColorStop(0,'rgba(0,0,0,0)'); g2.addColorStop(1,'rgba(0,0,0,.3)');
-  c.fillStyle=g2; c.fillRect(dx,dy+dh*0.6,dw,dh*0.4);
-  // Garis tepi bawah (highlight dekat viewer)
-  c.fillStyle='rgba(255,255,255,.08)';
-  c.fillRect(dx,dy+dh-2,dw,2);
+  // Gradient horizon (fade ke langit di bagian atas peta)
+  const grd=c.createLinearGradient(0,dy,0,dy+dh*0.4);
+  grd.addColorStop(0,'rgba(8,12,28,.6)'); grd.addColorStop(1,'rgba(8,12,28,0)');
+  c.save(); c.fillStyle=grd; c.fillRect(dx,dy,dw,dh*0.4); c.restore();
 }
 
 async function render(){
@@ -883,7 +861,7 @@ async function render(){
   c.fillStyle='rgba(0,0,0,.65)'; c.fillRect(0,y0+stripH-f2*1.7,sw+padX,f2*1.7);
   c.fillStyle='#fff'; c.fillText(sL,padX*.6,y0+stripH-f2*.85);
 
-  // Pin: posisi di tengah bawah peta (untuk efek 3D "berdiri" di atas permukaan)
+  // Pin: posisi di tengah bawah peta (utk efek 3D "berdiri" di atas permukaan)
   pin(c, mapW/2, y0+stripH*.58, stripH*.16);
 
   c.fillStyle='rgba(0,0,0,.78)'; c.fillRect(mapW,y0,W-mapW,stripH);
@@ -984,18 +962,15 @@ function bangunExif(m,withOffset){
   exif[piexif.ExifIFD.ColorSpace]=1;                                    // sRGB
   exif[piexif.ExifIFD.PixelXDimension]=W;
   exif[piexif.ExifIFD.PixelYDimension]=H;
+  // Bug #23: note ditanam di EXIF UserComment (prefix "ASCII\0\0\0" 8-byte sesuai standar EXIF)
+  if(note){
+    exif[piexif.ExifIFD.UserComment]='ASCII\0\0\0'+ascii(note);
+  }else{
+    delete exif[piexif.ExifIFD.UserComment];
+  }
   if(withOffset){                                                       // Bug #7: OffsetTime*
     const o=offsetStr(w.off);
     exif[0x9010]=o; exif[0x9011]=o; exif[0x9012]=o;
-  }
-
-  // Bug #23: Note kegiatan → UserComment. Prefix "ASCII\0\0\0" (8 byte) sesuai
-  // standar EXIF — cara yang sama seperti kamera Samsung asli menulis UserComment,
-  // sehingga reader standar (ExifTool/PIL/Windows) membacanya bersih tanpa anomali.
-  if(note){
-    exif[piexif.ExifIFD.UserComment]='ASCII\u0000\u0000\u0000'+ascii(note);
-  }else{
-    delete exif[piexif.ExifIFD.UserComment];
   }
 
   // Bug #17: tag kamera standar jika tidak ada di EXIF asli (supaya natural)

@@ -3,430 +3,579 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stempel Geotag Foto + Peta (GPS Map Camera Style)</title>
+<title>Stempel Geotag Foto + Peta (Auto EXIF Inject)</title>
+<!-- Library membaca EXIF -->
 <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
+<!-- Library menulis/memasukkan EXIF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/piexifjs/1.0.6/piexif.min.js"></script>
 <style>
- body{font-family:Arial,sans-serif;max-width:720px;margin:18px auto;padding:0 14px;background:#f5f5f5}
- .card{background:#fff;border-radius:10px;padding:14px 16px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.12)}
- label{font-size:13px;color:#555;display:block;margin:8px 0 3px;font-weight:bold;}
- input,select{width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box}
- .row{display:flex;gap:10px}.row>div{flex:1}
- button{padding:10px 18px;background:#1877f2;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;margin:8px 8px 0 0;font-weight:bold;}
- button.sec{background:#5f6368}
- button.geo{background:#00897b}
- canvas{width:100%;border:1px solid #ccc;border-radius:6px;margin-top:10px}
- #st{font-size:13px;color:#777;font-style:italic;}
+ :root{
+  --bg:#f3f5f7; --surface:#ffffff; --text:#0f172a; --muted:#475569; --border:#cbd5e1;
+  --primary:#0f766e; --primary-h:#115e59; --primary-fg:#ffffff;
+  --neutral:#475569; --neutral-h:#334155;
+  --success:#15803d; --success-h:#166534;
+  --info-bg:#ecfdf5; --info-bd:#a7f3d0; --focus:#2563eb;
+  --radius:12px; --shadow:0 1px 2px rgba(15,23,42,.06),0 4px 14px rgba(15,23,42,.06);
+ }
+ @media (prefers-color-scheme:dark){
+  :root{
+   --bg:#0b1220; --surface:#111a2b; --text:#e5e9f0; --muted:#a3afc2; --border:#2a3850;
+   --primary:#2dd4bf; --primary-h:#5eead4; --primary-fg:#04201d;
+   --neutral:#64748b; --neutral-h:#7b8aa0;
+   --success:#4ade80; --success-h:#86efac;
+   --info-bg:#0d2a24; --info-bd:#1f5b4d; --focus:#60a5fa;
+   --shadow:0 1px 2px rgba(0,0,0,.4);
+  }
+ }
+ *{box-sizing:border-box}
+ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:16px;line-height:1.5;
+  max-width:720px;margin:0 auto;padding:16px 16px 40px;background:var(--bg);color:var(--text)}
+ header.top{margin:8px 0 16px}
+ header.top h1{font-size:1.35rem;margin:0;line-height:1.3;display:flex;align-items:center;gap:8px}
+ header.top p{margin:4px 0 0;color:var(--muted);font-size:.875rem}
+ .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px;margin-bottom:14px;box-shadow:var(--shadow)}
+ .card h2{font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 4px;font-weight:700}
+ label{font-size:.875rem;color:var(--text);display:block;margin:12px 0 4px;font-weight:600}
+ input,select{width:100%;min-height:44px;padding:10px 12px;font:inherit;color:var(--text);background:var(--surface);
+  border:1px solid var(--border);border-radius:8px}
+ input[type=file]{padding:8px;cursor:pointer}
+ input::file-selector-button{min-height:36px;margin-right:12px;padding:6px 14px;border:0;border-radius:6px;
+  background:var(--primary);color:var(--primary-fg);font:inherit;font-weight:600;cursor:pointer}
+ :focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+ .hint{font-size:.8125rem;color:var(--muted);margin:4px 0 0}
+ .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
+ .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+ button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 18px;
+  background:var(--primary);color:var(--primary-fg);border:0;border-radius:8px;cursor:pointer;
+  font:inherit;font-weight:700;transition:background-color .18s ease,transform .18s ease}
+ button:hover{background:var(--primary-h)}
+ button:active{transform:translateY(1px)}
+ button svg{width:18px;height:18px;flex:none}
+ button.sec{background:var(--neutral);color:#fff}
+ button.sec:hover{background:var(--neutral-h)}
+ button.dl{background:var(--success);color:#fff}
+ button.dl:hover{background:var(--success-h)}
+ @media (prefers-color-scheme:dark){button.dl{color:#052e16}}
+ button:disabled{opacity:.45;cursor:not-allowed}
+ button:disabled:active{transform:none}
+ hr{border:0;border-top:1px dashed var(--border);margin:16px 0}
+ #st{display:block;margin-top:12px;font-size:.875rem;color:var(--muted);min-height:1.4em}
+ #meta{font-size:.8125rem;background:var(--info-bg);border:1px solid var(--info-bd);border-radius:8px;
+  padding:10px 12px;margin-top:10px;display:none;white-space:pre-line;line-height:1.6}
+ #cv{display:none;width:100%;height:auto;border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);background:var(--surface)}
+ @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
-<div class="card">
- <h2 style="margin:0">📍 Stempel Geotag Foto + Peta</h2>
- <small style="color:#888">Gaya GPS Map Camera — Panel Full Width, Ramping & Presisi</small>
- <label style="margin-top:10px">Pilih Foto</label>
- <input type="file" id="foto" accept="image/*">
-</div>
-<div class="card">
- <label>Baris 1 — Nama tempat (Besar)</label><input id="nama" value="Ambon, Maluku, Indonesia">
- <label>Baris 2 — Alamat detail</label><input id="alamat" value="Tantui, Sirimau, Ambon, Maluku, Indonesia">
- <button class="geo" onclick="cariKoordinat()">🔍 Cari Koordinat dari Alamat</button>
- 
- <hr style="border:0;border-top:1px dashed #ccc;margin:15px 0;">
+<header class="top">
+ <h1>
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+  Stempel Geotag Foto + Peta
+ </h1>
+ <p>Stempel visual di gambar, plus metadata EXIF yang sama di dalam file.</p>
+</header>
 
+<section class="card" aria-labelledby="h-foto">
+ <h2 id="h-foto">1 · Foto</h2>
+ <label for="foto">Pilih foto (JPG / PNG / WebP)</label>
+ <input type="file" id="foto" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp">
+ <p class="hint">Jika foto punya GPS dan waktu EXIF, isian di bawah terisi otomatis.</p>
+</section>
+
+<section class="card" aria-labelledby="h-lokasi">
+ <h2 id="h-lokasi">2 · Lokasi</h2>
+ <label for="nama">Nama tempat (baris besar)</label>
+ <input id="nama" value="Kantor Camat Sirimau" autocomplete="off">
+ <label for="alamat">Alamat detail (kecamatan / desa)</label>
+ <input id="alamat" value="Sirimau, Ambon, Maluku" autocomplete="off">
+ <div class="actions">
+  <button type="button" class="sec" id="btnCari" onclick="cariKoordinat()">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+   Cari koordinat dari alamat
+  </button>
+  <button type="button" class="sec" onclick="lokasiSaya()">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
+   Pakai GPS perangkat
+  </button>
+ </div>
+ <hr>
  <div class="row">
-  <div><label>Latitude</label><input id="lat" value="-3.6705"></div>
-  <div><label>Longitude</label><input id="lng" value="128.1908"></div>
-  <div style="max-width:110px"><label>Zoom peta</label>
+  <div><label for="lat">Latitude</label><input id="lat" value="-3.6934" inputmode="decimal"></div>
+  <div><label for="lng">Longitude</label><input id="lng" value="128.1818" inputmode="decimal"></div>
+  <div><label for="zoom">Zoom peta</label>
    <select id="zoom"><option>13</option><option>14</option><option selected>15</option><option>16</option><option>17</option></select>
   </div>
  </div>
- <button class="sec" onclick="lokasiSaya()">📍 Pakai lokasi GPS Perangkat Saat Ini</button>
- 
- <div class="row" style="margin-top:5px;">
-  <div><label>Tanggal</label><input id="tgl" type="date"></div>
-  <div><label>Jam</label><input id="jam" type="time"></div>
-  <div><label>Zona Waktu</label><input id="tz" value="GMT+09:00"></div>
+</section>
+
+<section class="card" aria-labelledby="h-waktu">
+ <h2 id="h-waktu">3 · Waktu</h2>
+ <div class="row">
+  <div><label for="tgl">Tanggal</label><input id="tgl" type="date"></div>
+  <div><label for="jam">Jam</label><input id="jam" type="time"></div>
+  <div><label for="tz">Zona waktu</label>
+   <select id="tz">
+    <option value="WIB">WIB (+07:00)</option>
+    <option value="WITA">WITA (+08:00)</option>
+    <option value="WIT" selected>WIT (+09:00)</option>
+   </select>
+  </div>
  </div>
- <label>Note</label><input id="cat" value="Captured by GPS Map Camera">
- 
- <hr style="border:0;border-top:1px dashed #ccc;margin:15px 0;">
- 
- <button onclick="render()">Buat Geotag</button>
- <button id="btnDl" style="display:none;background:#28a745;" onclick="unduh()">⬇ Download JPG (Inject EXIF)</button>
- <span id="st"></span>
-</div>
-<canvas id="cv"></canvas>
+</section>
+
+<section class="card" aria-labelledby="h-hasil">
+ <h2 id="h-hasil">4 · Hasil</h2>
+ <div class="actions" style="margin-top:8px">
+  <button type="button" id="btnBuat" onclick="render()">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+   Buat geotag
+  </button>
+  <button type="button" class="dl" id="btnDl" style="display:none" onclick="unduh()" disabled>
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>
+   Download JPG + EXIF
+  </button>
+ </div>
+ <span id="st" role="status" aria-live="polite"></span>
+ <div id="meta"></div>
+</section>
+
+<canvas id="cv" role="img" aria-label="Pratinjau foto dengan stempel geotag"></canvas>
 
 <script>
 const $=id=>document.getElementById(id);
-let img=null; const tileCache=new Map();
+const cv=$('cv');
 const two=n=>String(n).padStart(2,'0');
-const MAX_IMG_SIZE = 1200; 
+const MAX_IMG_SIZE = 1200;          // ukuran sisi terpanjang (px)
+const JPEG_QUALITY = 0.92;
+const TZ_OFFSET = {WIB:7, WITA:8, WIT:9};
 
-(()=>{const n=new Date();
- $('tgl').value=`${n.getFullYear()}-${two(n.getMonth()+1)}-${two(n.getDate())}`;
- $('jam').value=`${two(n.getHours())}:${two(n.getMinutes())}`;})();
+let img=null;                       // Image atau ImageBitmap (sudah tegak)
+let renderToken=0;                  // penanda render terbaru (bug #4)
+let lastMeta=null;                  // snapshot data yang sedang tampil di canvas
+let exifNote='';
+const tileCache=new Map();
 
-function getDecimalGPS(data, ref) {
-    if (!data) return null;
-    let dec = data[0] + (data[1]/60) + (data[2]/3600);
-    if (ref === 'S' || ref === 'W') dec *= -1;
-    return dec.toFixed(6);
+function setStatus(t){ $('st').textContent=t; }
+
+/* ---------- Nilai awal tanggal & jam ---------- */
+function isiWaktuSekarang(){
+  const n=new Date();
+  $('tgl').value=`${n.getFullYear()}-${two(n.getMonth()+1)}-${two(n.getDate())}`;
+  $('jam').value=`${two(n.getHours())}:${two(n.getMinutes())}`;
+}
+isiWaktuSekarang();
+
+/* ---------- Helper koordinat & waktu ---------- */
+// Bug #5: validasi koordinat
+function ambilKoordinat(){
+  const lat=parseFloat(String($('lat').value).trim().replace(',','.'));
+  const lng=parseFloat(String($('lng').value).trim().replace(',','.'));
+  if(!isFinite(lat)||lat<-90||lat>90) return {err:'Latitude harus berupa angka antara -90 sampai 90.'};
+  if(!isFinite(lng)||lng<-180||lng>180) return {err:'Longitude harus berupa angka antara -180 sampai 180.'};
+  return {lat,lng};
 }
 
-function getExifGPSCoordinate(dec) {
-    let abs = Math.abs(dec);
-    let deg = Math.floor(abs);
-    let min = Math.floor((abs - deg) * 60);
-    let sec = Math.round(((abs - deg - (min / 60)) * 3600) * 100);
-    return [[deg, 1], [min, 1], [sec, 100]];
+function ambilWaktu(){
+  if(!$('tgl').value||!$('jam').value) isiWaktuSekarang();
+  const [Y,M,D]=$('tgl').value.split('-').map(Number);
+  const [h,mi]=$('jam').value.split(':').map(Number);
+  const zona=$('tz').value;
+  const off=TZ_OFFSET[zona]!==undefined?TZ_OFFSET[zona]:9;
+  return {Y,M,D,h,mi,zona,off};
 }
 
-$('foto').onchange = e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    $('st').textContent = '⏳ Membaca metadata EXIF foto...';
-    
-    EXIF.getData(file, function() {
-        const latArr = EXIF.getTag(this, "GPSLatitude");
-        const latRef = EXIF.getTag(this, "GPSLatitudeRef");
-        const lngArr = EXIF.getTag(this, "GPSLongitude");
-        const lngRef = EXIF.getTag(this, "GPSLongitudeRef");
-        const dateTaken = EXIF.getTag(this, "DateTimeOriginal");
+function offsetStr(off){ return (off<0?'-':'+')+two(Math.abs(off))+':00'; }
 
-        if(latArr && lngArr) {
-            $('lat').value = getDecimalGPS(latArr, latRef);
-            $('lng').value = getDecimalGPS(lngArr, lngRef);$('st').textContent = '✅ Koordinat EXIF ditemukan!';
-        } else {
-            $('st').textContent = '⚠️ EXIF GPS tidak ditemukan. Akan di-inject saat download.';
-        }
+// Bug #6: konversi desimal -> derajat/menit/detik (rasional) tanpa risiko 60 detik
+function toDMSRational(dec){
+  const abs=Math.abs(dec);
+  let total=Math.round(abs*3600*10000);           // dalam satuan 1/10000 detik
+  const deg=Math.floor(total/(3600*10000)); total-=deg*3600*10000;
+  const min=Math.floor(total/(60*10000));   total-=min*60*10000;
+  return [[deg,1],[min,1],[total,10000]];
+}
+function rat(r){ return r[0]/r[1]; }
+function dmsToDec(dms,ref){
+  let d=rat(dms[0])+rat(dms[1])/60+rat(dms[2])/3600;
+  if(ref==='S'||ref==='W') d*=-1;
+  return d;
+}
+function ascii(s){
+  return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x20-\x7E]/g,'?');
+}
 
-        if(dateTaken) { 
-            const parts = dateTaken.split(' ');
-            if(parts.length === 2) {
-                $('tgl').value = parts[0].replace(/:/g, '-');$('jam').value = parts[1].substring(0,5);
-            }
-        }
-    });
+/* ---------- Membaca foto ---------- */
+// Bug #2: baca EXIF sebagai Promise, lalu render hanya sekali setelah semuanya siap
+function bacaExif(file){
+  return new Promise(resolve=>{
+    let done=false; const fin=v=>{ if(!done){done=true;resolve(v);} };
+    setTimeout(()=>fin(null),4000);
+    try{
+      EXIF.getData(file,function(){
+        try{
+          const latArr=EXIF.getTag(this,'GPSLatitude'), latRef=EXIF.getTag(this,'GPSLatitudeRef');
+          const lngArr=EXIF.getTag(this,'GPSLongitude'), lngRef=EXIF.getTag(this,'GPSLongitudeRef');
+          const dt=EXIF.getTag(this,'DateTimeOriginal');
+          const out={};
+          if(latArr&&lngArr&&latArr.length>=3&&lngArr.length>=3){
+            let la=Number(latArr[0])+Number(latArr[1])/60+Number(latArr[2])/3600;
+            let lo=Number(lngArr[0])+Number(lngArr[1])/60+Number(lngArr[2])/3600;
+            if(latRef==='S') la*=-1; if(lngRef==='W') lo*=-1;
+            if(isFinite(la)&&isFinite(lo)) { out.lat=la; out.lng=lo; }
+          }
+          if(typeof dt==='string'){
+            const m=dt.match(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2})/);
+            if(m){ out.tgl=`${m[1]}-${m[2]}-${m[3]}`; out.jam=`${m[4]}:${m[5]}`; }
+          }
+          fin(out);
+        }catch(e){ fin(null); }
+      });
+    }catch(e){ fin(null); }
+  });
+}
 
-    img = new Image();
-    img.onload = render;
-    img.src = URL.createObjectURL(file);
+// Bug #1 & #3: orientasi dipastikan tegak, tanpa kebocoran object URL
+async function muatGambar(file){
+  if(window.createImageBitmap){
+    try{ return await createImageBitmap(file,{imageOrientation:'from-image'}); }catch(e){}
+  }
+  return new Promise(res=>{
+    const i=new Image(), u=URL.createObjectURL(file);
+    i.onload=()=>{ URL.revokeObjectURL(u); res(i); };
+    i.onerror=()=>{ URL.revokeObjectURL(u); res(null); };
+    i.src=u;
+  });
+}
+
+$('foto').onchange=async e=>{
+  const file=e.target.files[0];
+  if(!file) return;
+  const nama=(file.name||'').toLowerCase(), tipe=(file.type||'').toLowerCase();
+
+  // Bug #12: format tidak didukung
+  if(/heic|heif/.test(tipe)||/\.(heic|heif)$/.test(nama)){
+    setStatus('⚠️ Format HEIC/HEIF tidak didukung browser. Ubah ke JPG dulu (atau set kamera ke "Most Compatible").');
+    e.target.value=''; return;
+  }
+  const isJpeg=/jpe?g/.test(tipe)||/\.jpe?g$/.test(nama);
+  if(!isJpeg && !/^image\/(png|webp)$/.test(tipe) && !/\.(png|webp)$/.test(nama)){
+    setStatus('⚠️ Format file tidak didukung. Gunakan JPG, PNG, atau WebP.');
+    e.target.value=''; return;
+  }
+
+  $('btnDl').disabled=true;
+  setStatus('⏳ Membaca foto & metadata EXIF...');
+  const info=isJpeg?await bacaExif(file):null;
+  const gambar=await muatGambar(file);
+  if(!gambar){
+    setStatus('⚠️ Foto gagal dibuka. File mungkin rusak atau formatnya tidak dikenali.');
+    return;
+  }
+  img=gambar;
+
+  const catatan=[];
+  if(info&&info.lat!==undefined){
+    $('lat').value=info.lat.toFixed(6); $('lng').value=info.lng.toFixed(6);
+    catatan.push('koordinat dari EXIF foto');
+  }else{
+    catatan.push(isJpeg?'EXIF GPS tidak ada, memakai isian Anda (akan di-inject saat download)':'PNG/WebP tidak punya EXIF, memakai isian Anda');
+  }
+  if(info&&info.tgl){ $('tgl').value=info.tgl; $('jam').value=info.jam; catatan.push('waktu dari EXIF'); }
+  exifNote=' ('+catatan.join('; ')+')';
+  render();
 };
 
+/* ---------- GPS perangkat & pencarian alamat ---------- */
 function lokasiSaya(){
-    $('st').textContent='⏳ Melacak GPS...';
-    navigator.geolocation?.getCurrentPosition(p=>{
-        $('lat').value=p.coords.latitude.toFixed(6);$('lng').value=p.coords.longitude.toFixed(6);
-        render();
-    }, e => alert("Gagal melacak GPS."));
+  if(!navigator.geolocation){ setStatus('⚠️ Browser ini tidak mendukung GPS.'); return; }
+  setStatus('⏳ Melacak GPS perangkat...');
+  navigator.geolocation.getCurrentPosition(p=>{
+    $('lat').value=p.coords.latitude.toFixed(6);
+    $('lng').value=p.coords.longitude.toFixed(6);
+    exifNote=' (koordinat dari GPS perangkat)';
+    setStatus('✅ Lokasi GPS didapat.');
+    if(img) render();
+  }, ()=>{
+    setStatus('⚠️ Gagal melacak GPS. Pastikan izin lokasi browser aktif.');
+  }, {enableHighAccuracy:true, timeout:15000, maximumAge:0});
 }
 
-async function cariKoordinat() {
-    const nama = $('nama').value.trim();
-    const alamat = $('alamat').value.trim();
-    if (!nama && !alamat) return alert("Isi nama tempat atau alamat.");
-    
-    $('st').textContent = '⏳ Mencari koordinat...';
-    const bersihkan = (text) => text.replace(/Kecamatan|Kota|Provinsi|Kabupaten/gi, '').replace(/\s+/g, ' ').trim();
-    const namaBersih = bersihkan(nama);
-    const alamatBersih = bersihkan(alamat);
-
-    const queries = [
-        `${alamat}, ${nama}`,
-        `${alamatBersih}, ${namaBersih}`,
-        `${alamat}, Ambon`,
-        `${alamatBersih}, Ambon`,
-        `${nama}, ${alamat}`,
-        `${namaBersih}`,
-        `${alamat}`
-    ];
-    const uniqueQueries = [...new Set(queries)].filter(q => q && q.length > 2);
-
-    for (let q of uniqueQueries) {
-        try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`);
-            const data = await res.json();
-            if (data && data.length > 0) {
-                $('lat').value = parseFloat(data[0].lat).toFixed(6);
-                $('lng').value = parseFloat(data[0].lon).toFixed(6);$('st').textContent = `✅ Koordinat ditemukan!`;
-                if(img) render();
-                return;
-            }
-        } catch(e){}
+// Bug #8: cek status HTTP, bahasa Indonesia, cegah klik beruntun
+async function cariKoordinat(){
+  const query=$('nama').value.trim()+', '+$('alamat').value.trim();
+  if(query.length<5){ alert('Isi nama tempat dan alamat detail dengan jelas.'); return; }
+  const btn=$('btnCari'); btn.disabled=true;
+  setStatus('⏳ Mencari koordinat...');
+  try{
+    const res=await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=id&q=${encodeURIComponent(query)}`);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    if(data&&data.length>0){
+      $('lat').value=parseFloat(data[0].lat).toFixed(6);
+      $('lng').value=parseFloat(data[0].lon).toFixed(6);
+      exifNote=' (koordinat dari pencarian alamat)';
+      setStatus('✅ Koordinat ditemukan dari alamat!');
+      if(img) render();
+    }else{
+      setStatus('⚠️ Alamat tidak spesifik, koordinat tidak ditemukan.');
+      alert('Koordinat tidak ditemukan. Coba gunakan nama kecamatan atau kota.');
     }
-    $('st').textContent = '⚠️ Koordinat tidak ditemukan.';
+  }catch(err){
+    setStatus('⚠️ Gagal mencari koordinat ('+err.message+'). Periksa koneksi atau coba lagi sebentar lagi.');
+  }
+  setTimeout(()=>{btn.disabled=false;},1100); // hormati batas 1 request/detik Nominatim
 }
 
+/* ---------- Peta ---------- */
 function loadTile(z,x,y){
- const k=`${z}/${x}/${y}`;
- if(tileCache.has(k))return tileCache.get(k);
- const p=new Promise((res,rej)=>{const i=new Image();i.crossOrigin='anonymous';
-  i.onload=()=>res(i);i.onerror=rej;
-  i.src=`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;});
- tileCache.set(k,p);return p;
+  const k=`${z}/${x}/${y}`;
+  if(tileCache.has(k)) return tileCache.get(k);
+  const p=new Promise((res,rej)=>{
+    const i=new Image(); i.crossOrigin='anonymous';
+    i.onload=()=>res(i); i.onerror=rej;
+    i.src=`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+  });
+  // tile yang gagal tidak disimpan di cache supaya bisa dicoba lagi
+  p.catch(()=>tileCache.delete(k));
+  tileCache.set(k,p);
+  return p;
 }
 
 async function buatPeta(lat,lon,z,dw,dh){
- const TS=256,n=Math.pow(2,z);
- const xt=(lon+180)/360*n;
- const yt=(1-Math.log(Math.tan(lat*Math.PI/180)+1/Math.cos(lat*Math.PI/180))/Math.PI)/2*n;
- const tx=Math.floor(xt),ty=Math.floor(yt);
- const off=document.createElement('canvas');off.width=off.height=TS*3;
- const oc=off.getContext('2d');oc.fillStyle='#37474F';oc.fillRect(0,0,off.width,off.height);
- let ok=0;
- await Promise.all([...Array(3)].flatMap((_,a)=>[...Array(3)].map(async(_,b)=>{
-  try{const im=await loadTile(z,tx+a-1,ty+b-1);oc.drawImage(im,a*TS,b*TS);ok++;}catch(e){}
- })));
- if(!ok)return{ok:false};
- const fx=(xt-(tx-1))*TS, fy=(yt-(ty-1))*TS;
- const cw=Math.min(TS*(dw/dh),TS*2), ch=cw*dh/dw;
- const cl=(v,lo,hi)=>Math.min(Math.max(v,lo),hi);
- return{ok:true,off,sx:cl(fx-cw/2,0,off.width-cw),sy:cl(fy-ch/2,0,off.height-ch),cw,ch};
+  const TS=256, n=Math.pow(2,z);
+  const latC=Math.max(-85.05,Math.min(85.05,lat));
+  const xt=(lon+180)/360*n;
+  const yt=(1-Math.log(Math.tan(latC*Math.PI/180)+1/Math.cos(latC*Math.PI/180))/Math.PI)/2*n;
+  const tx=Math.floor(xt), ty=Math.floor(yt);
+  const off=document.createElement('canvas'); off.width=off.height=TS*3;
+  const oc=off.getContext('2d'); oc.fillStyle='#37474F'; oc.fillRect(0,0,off.width,off.height);
+  let ok=0;
+  await Promise.all([...Array(3)].flatMap((_,a)=>[...Array(3)].map(async(_,b)=>{
+    const X=((tx+a-1)%n+n)%n, Y=ty+b-1;
+    if(Y<0||Y>=n) return;
+    try{ const im=await loadTile(z,X,Y); oc.drawImage(im,a*TS,b*TS); ok++; }catch(e){}
+  })));
+  if(!ok) return {ok:false,count:0};
+  const fx=(xt-(tx-1))*TS, fy=(yt-(ty-1))*TS;
+  const cw=Math.min(TS*(dw/dh),TS*2), ch=cw*dh/dw;
+  const cl=(v,lo,hi)=>Math.min(Math.max(v,lo),hi);
+  return {ok:true,count:ok,off,sx:cl(fx-cw/2,0,off.width-cw),sy:cl(fy-ch/2,0,off.height-ch),cw,ch};
 }
 
-function rr(c,x,y,w,h,r, rTopLeft=r, rTopRight=r, rBottomRight=r, rBottomLeft=r){
-    c.beginPath();
-    c.moveTo(x + rTopLeft, y);
-    c.lineTo(x + w - rTopRight, y);
-    c.quadraticCurveTo(x + w, y, x + w, y + rTopRight);
-    c.lineTo(x + w, y + h - rBottomRight);
-    c.quadraticCurveTo(x + w, y + h, x + w - rBottomRight, y + h);
-    c.lineTo(x + rBottomLeft, y + h);
-    c.quadraticCurveTo(x, y + h, x, y + h - rBottomLeft);
-    c.lineTo(x, y + rTopLeft);
-    c.quadraticCurveTo(x, y, x + rTopLeft, y);
-    c.closePath();
-}
+/* ---------- Gambar elemen ---------- */
+function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);
+ c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
 
 function pin(c,cx,cy,r){
- c.save();
- c.shadowColor='rgba(0,0,0,0.5)';c.shadowBlur=r*0.4;c.shadowOffsetY=r*0.15;
- c.fillStyle='#EA4335';c.strokeStyle='#B31412';c.lineWidth=r*0.08;
- c.beginPath();c.moveTo(cx,cy);
- c.arc(cx,cy-r*0.85,r*0.55,Math.PI*0.78,Math.PI*0.22,false);
- c.closePath();c.fill();c.stroke();
- c.fillStyle='#7A0A0A';c.beginPath();c.arc(cx,cy-r*0.85,r*0.22,0,Math.PI*2);c.fill();
- c.restore();
+ c.save();c.shadowColor='rgba(0,0,0,.5)';c.shadowBlur=r*.6;c.shadowOffsetY=r*.2;
+ c.fillStyle='#E53935';c.strokeStyle='#9E1C1C';c.lineWidth=r*.14;
+ c.beginPath();c.moveTo(cx,cy+r*.85);
+ c.arc(cx,cy-r*.5,r,Math.PI*5/6,Math.PI/6+Math.PI*2,false);
+ c.closePath();c.fill();c.shadowColor='transparent';c.stroke();c.restore();
 }
 
-function drawMapText(c, text, x, y, size) {
-    if(!text) return;
-    c.save();
-    c.font = `bold ${size}px Arial`;
-    c.textBaseline = 'alphabetic';
-    c.strokeStyle = '#000000';
-    c.lineWidth = size * 0.22;
-    c.lineJoin = 'round';
-    c.strokeText(text, x, y);
-    c.fillStyle = '#FFFEE4';
-    c.fillText(text, x, y);
-    c.restore();
-}
-
-function flag(c,x,y,w){const h=w*.65;
- c.save();
+function flag(c,x,y,w){const h=w*.68;
  c.fillStyle='#DD2C2C';c.fillRect(x,y,w,h/2);
  c.fillStyle='#fff';c.fillRect(x,y+h/2,w,h/2);
- c.strokeStyle='rgba(0,0,0,.35)';c.lineWidth=1;c.strokeRect(x,y,w,h);
- c.restore();
-}
+ c.strokeStyle='rgba(0,0,0,.35)';c.lineWidth=1;c.strokeRect(x,y,w,h);}
 
 function tulis(c,t,x,y,maxW,fs,warna,bold=''){
  let s=fs;c.font=`${bold} ${s}px Arial`;
- while(c.measureText(t).width>maxW&&s>fs*.45){
-     s*=.95;
-     c.font=`${bold} ${s}px Arial`;
- }
+ while(c.measureText(t).width>maxW&&s>fs*.45){ s*=.95; c.font=`${bold} ${s}px Arial`; }
  c.fillStyle=warna;c.fillText(t,x,y);}
 
+/* ---------- Render utama ---------- */
 async function render(){
- if(!img)return;
- $('st').textContent='⏳ Memproses gambar & memuat peta...';
- 
- let scale = 1;
- if (img.naturalWidth > MAX_IMG_SIZE || img.naturalHeight > MAX_IMG_SIZE) {
-     scale = Math.min(MAX_IMG_SIZE / img.naturalWidth, MAX_IMG_SIZE / img.naturalHeight);
- }
- const W = img.naturalWidth * scale;
- const H = img.naturalHeight * scale;
- 
- cv.width = W; cv.height = H;
- const c = cv.getContext('2d');
- c.drawImage(img, 0, 0, W, H);
+  if(!img) return;
+  const token=++renderToken;                 // Bug #4: hanya render terbaru yang dipakai
+  $('btnDl').disabled=true;                  // Bug #10: tidak boleh download saat render berjalan
 
- // --- PENGATURAN PANEL (FULL WIDTH & LEBIH PENDEK) ---
- // Tinggi panel diatur lebih kecil: antara 15% - 20% dari lebar, maksimal 130px agar ramping
- const cardH = Math.round(Math.min(Math.max(W * 0.15, 80), W * 0.22)); 
- const cardW = W; // Full width menutupi foto dari kiri ke kanan
- const cardX = 0;
- const cardY = H - cardH - (W * 0.015); // Sedikit margin dari bawah foto
- const cornerRadius = cardH * 0.12;
+  const k=ambilKoordinat();
+  if(k.err){ setStatus('⚠️ '+k.err); return; }
+  const w=ambilWaktu();
+  setStatus('⏳ Memproses gambar & memuat peta...');
 
- // Background Panel Gelap Transparan
- c.save();
- rr(c, cardX, cardY, cardW, cardH, cornerRadius, cornerRadius, cornerRadius, cornerRadius);
- c.fillStyle = 'rgba(0, 0, 0, 0.70)';
- c.fill();
- c.restore();
+  const iw=img.naturalWidth||img.width, ih=img.naturalHeight||img.height;
+  let scale=1;
+  if(iw>MAX_IMG_SIZE||ih>MAX_IMG_SIZE) scale=Math.min(MAX_IMG_SIZE/iw,MAX_IMG_SIZE/ih);
+  const W=Math.round(iw*scale), H=Math.round(ih*scale);
 
- // --- PETA SATELIT (KIRI) ---
- const mapH = cardH;
- const mapW = mapH; // Peta berbentuk persegi
- const mapX = cardX;
- const mapY = cardY;
+  const f1=W*.037, f2=W*.020, f3=W*.0225, pad=W*.011, padX=W*.014;
+  const tot=f1*1.16+(f2+f3*2)*1.36+pad*2;
+  const stripH=Math.round(Math.min(Math.max(tot,W*.13),W*.20));
+  const y0=H-stripH, mapW=Math.round(stripH);
 
- const peta = await buatPeta(parseFloat($('lat').value), parseFloat($('lng').value), +$('zoom').value, mapW, mapH);
- 
- c.save();
- // Round corner peta disamakan dengan panel
- rr(c, mapX, mapY, mapW, mapH, cornerRadius, 0, 0, cornerRadius); 
- c.clip();
- if (peta.ok) {
-     c.drawImage(peta.off, peta.sx, peta.sy, peta.cw, peta.ch, mapX, mapY, mapW, mapH);
- } else {
-     c.fillStyle = '#37474F';
-     c.fillRect(mapX, mapY, mapW, mapH);
- }
- 
- pin(c, mapX + mapW / 2, mapY + mapH * 0.52, mapH * 0.20);
- 
- const alamatParts = $('alamat').value.split(',').map(s=>s.trim()).filter(Boolean);
- const pinLabel = alamatParts[0] || 'Tantui';
- const cityLabel = alamatParts[2] || alamatParts[1] || $('nama').value.split(',')[0].trim() || 'Ambon';
+  const judul=$('nama').value.trim(), alamat=$('alamat').value.trim();
+  const koord=`Lat ${k.lat.toFixed(6)}, Long ${k.lng.toFixed(6)}`;
+  const hari=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][new Date(w.Y,w.M-1,w.D).getDay()];
+  const waktu=`${hari}, ${two(w.D)}/${two(w.M)}/${w.Y} ${w.h%12||12}:${two(w.mi)} ${w.h>=12?'PM':'AM'} ${w.zona}`;
 
- drawMapText(c, pinLabel, mapX + mapW / 2 + mapH * 0.10, mapY + mapH * 0.52, mapH * 0.13);
- drawMapText(c, cityLabel, mapX + mapH * 0.05, mapY + mapH * 0.90, mapH * 0.16);
- c.restore();
+  const peta=await buatPeta(k.lat,k.lng,+$('zoom').value,mapW,stripH);
+  if(token!==renderToken) return;            // ada render yang lebih baru, batalkan
 
- // --- PANEL TEKS & BADGE ---
- const textX = mapX + mapW + W * 0.02; // Jarak dari peta
- const textMaxW = cardW - mapW - W * 0.04;
- 
- // Badge GPS (Pojok Kanan Atas)
- const badgeH = cardH * 0.18;
- const badgeW = badgeH * 5.2;
- const badgeX = cardX + cardW - badgeW - (W * 0.015);
- const badgeY = cardY + (cardH * 0.08);
+  // semua penggambaran dilakukan sinkron setelah peta siap (tidak saling menimpa)
+  cv.width=W; cv.height=H; cv.style.display='block';
+  const c=cv.getContext('2d');
+  c.drawImage(img,0,0,W,H);
 
- c.save();
- rr(c, badgeX, badgeY, badgeW, badgeH, badgeH * 0.3);
- c.fillStyle = 'rgba(25, 25, 25, 0.85)';
- c.fill();
- 
- const iconS = badgeH * 0.60;
- const iconX = badgeX + badgeH * 0.25;
- const iconY = badgeY + (badgeH - iconS) / 2;
- rr(c, iconX, iconY, iconS, iconS, iconS * 0.2);
- c.fillStyle = '#2ECC40'; c.fill();
- c.fillStyle = '#0074D9'; c.fillRect(iconX + iconS*0.2, iconY + iconS*0.2, iconS*0.6, iconS*0.6);
- 
- c.fillStyle = '#FFFFFF';
- c.font = `bold ${badgeH * 0.55}px Arial`;
- c.textBaseline = 'middle';
- c.fillText('GPS Map Camera', iconX + iconS + badgeH * 0.3, badgeY + badgeH / 2);
- c.restore();
+  if(peta.ok) c.drawImage(peta.off,peta.sx,peta.sy,peta.cw,peta.ch,0,y0,mapW,stripH);
+  else{ c.fillStyle='#455A64'; c.fillRect(0,y0,mapW,stripH); }
 
- const d = $('tgl').value ? new Date($('tgl').value + 'T00:00:00') : new Date();
- const hari = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][d.getDay()];
- const tglFormatted = `${two(d.getDate())}/${two(d.getMonth()+1)}/${d.getFullYear()}`;
- let [h, m] = $('jam').value.split(':'); h = +h;
- const ampm = h >= 12 ? 'PM' : 'AM';
- const h12 = h % 12 || 12;
- const waktu = `${hari}, ${tglFormatted} ${two(h12)}:${m} ${ampm} ${$('tz').value}`;
+  c.font=`${f2*.95}px Arial`; c.textBaseline='middle';
+  const sL='Satellite © Esri', sw=c.measureText(sL).width;
+  c.fillStyle='rgba(0,0,0,.55)'; c.fillRect(0,y0+stripH-f2*1.7,sw+padX,f2*1.7);
+  c.fillStyle='#fff'; c.fillText(sL,padX*.6,y0+stripH-f2*.85);
 
- const judul = $('nama').value.trim();
- const alamat = $('alamat').value.trim();
- const koord = `Lat ${$('lat').value}, Long ${$('lng').value}`;
- const note = 'Note : ' + ($('cat').value.trim() || '-');
+  pin(c,mapW/2,y0+stripH*.60,stripH*.155);
 
- // --- PENGATURAN FONT (LEBIH KECIL & PRESISI) ---
- const padY = cardH * 0.08;
- const f1 = cardH * 0.17; // Judul lebih kecil proporsional
- const f2 = cardH * 0.12; 
- const f3 = cardH * 0.12;
- const f4 = cardH * 0.12;
- const f5 = cardH * 0.10;
- const lineGap = cardH * 0.04;
+  c.fillStyle='rgba(0,0,0,.78)'; c.fillRect(mapW,y0,W-mapW,stripH);
+  const tx=mapW+padX, maxW=W-mapW-padX*2;
+  c.textBaseline='top';
+  let y=y0+pad;
 
- c.textBaseline = 'top';
- let y = cardY + padY;
+  let curF1=f1;
+  c.font=`bold ${curF1}px Arial`;
+  let tw=c.measureText(judul).width, fw=curF1*.62, gap=curF1*.28;
+  while(judul&&tw+fw+gap>maxW&&curF1>2){
+    curF1*=0.95; c.font=`bold ${curF1}px Arial`;
+    tw=c.measureText(judul).width; fw=curF1*.62; gap=curF1*.28;
+  }
+  c.fillStyle='#fff'; if(judul) c.fillText(judul,tx,y);
+  flag(c,tx+tw+gap,y+curF1*.14,fw);
+  y+=curF1*1.16+pad*.2;
+  tulis(c,alamat,tx,y,maxW,f2,'#d9d9d9'); y+=f2*1.36;
+  tulis(c,koord,tx,y,maxW,f3,'#fff');     y+=f3*1.36;
+  tulis(c,waktu,tx,y,maxW,f3,'#fff');
 
- // Baris 1: Judul
- const maxW1 = textMaxW - badgeW - W * 0.01;
- let curF1 = f1;
- c.font = `bold ${curF1}px Arial`;
- let tw = c.measureText(judul).width, fw = curF1 * 0.65, gap = curF1 * 0.3;
- while(judul && tw + fw + gap > maxW1 && curF1 > 6){
-     curF1 *= 0.95;
-     c.font = `bold ${curF1}px Arial`;
-     tw = c.measureText(judul).width;
-     fw = curF1 * 0.65; gap = curF1 * 0.3;
- }
- c.fillStyle = '#FFFEE4';
- if(judul) c.fillText(judul, textX, y);
- if(judul) flag(c, textX + tw + gap, y + curF1 * 0.12, fw);
- y += curF1 + lineGap;
+  const bh=stripH*.22, bw=bh*2.55, mg=W*.008;
+  const bx=W-bw-mg, by=y0-bh*.30;
+  rr(c,bx,by,bw,bh,bh*.3); c.fillStyle='rgba(20,20,20,.85)'; c.fill();
+  c.fillStyle='#2ECC40'; c.beginPath(); c.arc(bx+bh*.55,by+bh/2,bh*.16,0,7); c.fill();
+  c.fillStyle='#fff'; c.font=`bold ${bh*.5}px Arial`; c.textBaseline='middle';
+  c.fillText('GPS',bx+bh*.95,by+bh*.56);
 
- // Sisa Baris
- tulis(c, alamat, textX, y, textMaxW, f2, '#FFFEE4'); y += f2 + lineGap;
- tulis(c, koord, textX, y, textMaxW, f3, '#FFFEE4');  y += f3 + lineGap;
- tulis(c, waktu, textX, y, textMaxW, f4, '#FFFEE4');  y += f4 + lineGap;
- tulis(c, note, textX, y, textMaxW, f5, '#E0E0E0');
+  // snapshot: metadata file nanti memakai data yang PERSIS sama dengan stempel di gambar
+  lastMeta={lat:k.lat,lng:k.lng,judul,alamat,w,W,H};
 
- $('btnDl').style.display = 'inline-block';$('st').textContent = '✅ Selesai — cek preview lalu Download JPG';
+  let msg='✅ Selesai — cek preview lalu Download JPG';
+  if(!peta.ok) msg='⚠️ Peta gagal dimuat (offline / diblokir?). Stempel dibuat tanpa gambar peta.';
+  else if(peta.count<9) msg+=' (sebagian tile peta gagal dimuat)';
+  setStatus(msg+exifNote);
+
+  $('btnDl').style.display='inline-block';
+  $('btnDl').disabled=false;
+}
+
+/* ---------- Download + inject EXIF ---------- */
+function dataURLtoBlob(d){
+  const b=atob(d.split(',')[1]), a=new Uint8Array(b.length);
+  for(let i=0;i<b.length;i++) a[i]=b.charCodeAt(i);
+  return new Blob([a],{type:'image/jpeg'});
+}
+
+function simpanBlob(blob,nama){
+  const u=URL.createObjectURL(blob), a=document.createElement('a');
+  a.download=nama; a.href=u; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u),15000);
+}
+
+function bangunExif(m,withOffset){
+  const {w}=m;
+  const dt=`${w.Y}:${two(w.M)}:${two(w.D)} ${two(w.h)}:${two(w.mi)}:00`;
+
+  // waktu UTC untuk tag GPS (dihitung dari zona yang dipilih)
+  const utc=new Date(Date.UTC(w.Y,w.M-1,w.D,w.h-w.off,w.mi,0));
+  const gpsDate=`${utc.getUTCFullYear()}:${two(utc.getUTCMonth()+1)}:${two(utc.getUTCDate())}`;
+
+  const zeroth={}, exif={}, gps={};
+  zeroth[piexif.ImageIFD.ImageDescription]=ascii(`${m.judul} - ${m.alamat}`);
+  zeroth[piexif.ImageIFD.Software]='Stempel Geotag';
+  zeroth[piexif.ImageIFD.Orientation]=1;          // Bug #11: piksel sudah tegak, jangan diputar lagi
+  zeroth[piexif.ImageIFD.DateTime]=dt;
+
+  exif[piexif.ExifIFD.ExifVersion]='0230';
+  exif[piexif.ExifIFD.DateTimeOriginal]=dt;
+  exif[piexif.ExifIFD.DateTimeDigitized]=dt;
+  exif[piexif.ExifIFD.ColorSpace]=1;
+  exif[piexif.ExifIFD.PixelXDimension]=m.W;
+  exif[piexif.ExifIFD.PixelYDimension]=m.H;
+  if(withOffset){                                  // Bug #7: zona waktu (OffsetTime*)
+    const o=offsetStr(w.off);
+    exif[0x9010]=o; exif[0x9011]=o; exif[0x9012]=o;
+  }
+
+  gps[piexif.GPSIFD.GPSVersionID]=[2,3,0,0];
+  gps[piexif.GPSIFD.GPSLatitudeRef]=m.lat<0?'S':'N';
+  gps[piexif.GPSIFD.GPSLatitude]=toDMSRational(m.lat);
+  gps[piexif.GPSIFD.GPSLongitudeRef]=m.lng<0?'W':'E';
+  gps[piexif.GPSIFD.GPSLongitude]=toDMSRational(m.lng);
+  gps[piexif.GPSIFD.GPSMapDatum]='WGS-84';
+  gps[piexif.GPSIFD.GPSDateStamp]=gpsDate;
+  gps[piexif.GPSIFD.GPSTimeStamp]=[[utc.getUTCHours(),1],[utc.getUTCMinutes(),1],[0,1]];
+
+  return piexif.dump({"0th":zeroth,"Exif":exif,"GPS":gps});
+}
+
+function verifikasi(newJpeg,m){
+  try{
+    const r=piexif.load(newJpeg);
+    const g=r.GPS||{}, e=r.Exif||{};
+    const lat=dmsToDec(g[piexif.GPSIFD.GPSLatitude],g[piexif.GPSIFD.GPSLatitudeRef]);
+    const lng=dmsToDec(g[piexif.GPSIFD.GPSLongitude],g[piexif.GPSIFD.GPSLongitudeRef]);
+    const w=m.w;
+    const dt=`${w.Y}:${two(w.M)}:${two(w.D)} ${two(w.h)}:${two(w.mi)}:00`;
+    return Math.abs(lat-m.lat)<0.00001 && Math.abs(lng-m.lng)<0.00001 && e[piexif.ExifIFD.DateTimeOriginal]===dt;
+  }catch(err){ return false; }
 }
 
 function unduh(){
-    $('st').textContent='⏳ Menanamkan (Injecting) EXIF & Mengunduh...';
-    const jpegData = cv.toDataURL('image/jpeg', 0.90);
-    
-    try {
-        let lat = parseFloat($('lat').value);
-        let lng = parseFloat($('lng').value);
-        let latRef = lat < 0 ? "S" : "N";
-        let lngRef = lng < 0 ? "W" : "E";
-        
-        let tgl = $('tgl').value.replace(/-/g, ":"); 
-        let jam = $('jam').value;
-        if(jam.length === 5) jam += ":00";
-        let dateTimeStr = tgl + " " + jam;
+  if($('btnDl').disabled||!lastMeta){ setStatus('⏳ Tunggu proses selesai dulu, lalu download.'); return; }
+  const m=lastMeta;
+  const nama=`Geotag_${m.w.Y}-${two(m.w.M)}-${two(m.w.D)}_${two(m.w.h)}${two(m.w.mi)}.jpg`;
+  setStatus('⏳ Menanamkan (injecting) EXIF & mengunduh...');
+  const jpegData=cv.toDataURL('image/jpeg',JPEG_QUALITY);
 
-        let zerothIfd = {};
-        let exifIfd = {};
-        let gpsIfd = {};
+  try{
+    let bytes, offsetOk=true;
+    try{ bytes=bangunExif(m,true); }
+    catch(e){ offsetOk=false; bytes=bangunExif(m,false); }   // versi piexif yang tidak mengenal OffsetTime
 
-        zerothIfd[piexif.ImageIFD.DateTime] = dateTimeStr;
-        exifIfd[piexif.ExifIFD.DateTimeOriginal] = dateTimeStr;
-        exifIfd[piexif.ExifIFD.DateTimeDigitized] = dateTimeStr;
+    const newJpeg=piexif.insert(bytes,jpegData);
+    const valid=verifikasi(newJpeg,m);
+    simpanBlob(dataURLtoBlob(newJpeg),nama);
 
-        gpsIfd[piexif.GPSIFD.GPSLatitudeRef] = latRef;
-        gpsIfd[piexif.GPSIFD.GPSLatitude] = getExifGPSCoordinate(lat);
-        gpsIfd[piexif.GPSIFD.GPSLongitudeRef] = lngRef;
-        gpsIfd[piexif.GPSIFD.GPSLongitude] = getExifGPSCoordinate(lng);
-
-        let exifObj = {"0th": zerothIfd, "Exif": exifIfd, "GPS": gpsIfd};
-        let exifBytes = piexif.dump(exifObj);
-        
-        let newJpeg = piexif.insert(exifBytes, jpegData);
-        
-        const a = document.createElement('a');
-        a.download = `Geotag_${$('tgl').value}_${$('jam').value.replace(':','')}.jpg`;
-        a.href = newJpeg;
-        a.click();
-        $('st').textContent='✅ File berhasil diunduh dengan Metadata!';
-    } catch (e) {
-        console.error("Gagal inject EXIF: ", e);
-        const a = document.createElement('a');
-        a.download = `Geotag_${$('tgl').value}_${$('jam').value.replace(':','')}.jpg`;
-        a.href = jpegData;
-        a.click();
-        $('st').textContent='⚠️ Diunduh tanpa Metadata (Error Inject).';
-    }
+    setStatus(valid?'✅ File diunduh. Metadata terverifikasi sama dengan isian Anda.'
+                   :'⚠️ File diunduh, tetapi pengecekan metadata tidak cocok. Cek di properti file.');
+    const w=m.w;
+    const el=$('meta'); el.style.display='block';
+    el.textContent=
+      `Metadata tertanam di file:\n`+
+      `• GPS: ${m.lat.toFixed(6)}, ${m.lng.toFixed(6)} (WGS-84)\n`+
+      `• Waktu foto: ${w.Y}-${two(w.M)}-${two(w.D)} ${two(w.h)}:${two(w.mi)} ${w.zona}`+(offsetOk?` (${offsetStr(w.off)})`:'')+`\n`+
+      `• Deskripsi: ${ascii(m.judul+' - '+m.alamat)}\n`+
+      `• Orientasi: normal, ukuran ${m.W}×${m.H}px`;
+  }catch(e){
+    console.error('Gagal inject EXIF:',e);
+    simpanBlob(dataURLtoBlob(jpegData),nama);
+    setStatus('⚠️ Diunduh TANPA metadata (error inject: '+e.message+').');
+    $('meta').style.display='none';
+  }
 }
 
-['lat','lng','zoom','tgl','jam','tz','cat'].forEach(id=>$(id).addEventListener('change',render));
-['nama','alamat'].forEach(id=>$(id).addEventListener('change', () => { if(img) render(); }));
+/* ---------- Event input (debounce) ---------- */
+let tmr;
+const jadwal=()=>{
+  if(!img) return;
+  $('btnDl').disabled=true;                   // hasil lama tidak boleh diunduh saat input berubah
+  clearTimeout(tmr);
+  tmr=setTimeout(()=>{ exifNote=''; render(); },450);
+};
+['lat','lng','zoom','tgl','jam','tz','nama','alamat'].forEach(id=>{
+  $(id).addEventListener('input',jadwal);
+  $(id).addEventListener('change',jadwal);
+});
 </script>
 </body>
 </html>

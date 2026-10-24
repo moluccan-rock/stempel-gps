@@ -128,7 +128,7 @@
    </select>
   </div>
  </div>
- <p class="hint">"Lokasi acak terdekat" membuat titik baru berjarak acak dari koordinat sekarang — lalu alamat otomatis dicari ulang supaya metadata tetap cocok. Berguna supaya setiap foto tidak berkoordinat persis sama.</p>
+ <p class="hint">"Lokasi acak terdekat" membuat titik baru dalam radius dari titik alamat yang dicari — dan tiap kandidat diuji online (reverse-geocode) supaya tetap berada di kecamatan yang sama dengan alamat terisi. Kalau semua kandidat keluar kecamatan (dekat batas), koordinat tidak diubah. Berguna supaya setiap foto tidak berkoordinat persis sama.</p>
 </section>
 
 <section class="card" aria-labelledby="h-waktu">
@@ -199,6 +199,7 @@ let renderToken=0;
 let lastMeta=null;
 let originalExif=null;              // Bug #13: simpan EXIF penuh dari foto asli
 let exifNote='';
+let jangkar=null;   // Bug #24: titik jangkar = titik alamat yang terisi (hasil cari/reverse) — kunci kecamatan utk lokasi acak
 const tileCache=new Map();
 
 function setStatus(t){ $('st').textContent=t; }
@@ -422,19 +423,26 @@ function bangunQueryPencarian(){
   const list=[];
   const push=q=>{ q=(q||'').replace(/\s+/g,' ').trim(); if(q.length>=4&&!list.includes(q)) list.push(q); };
 
+  // Bug #24: kota dari title "Kota, Provinsi, Indonesia"
+  const kota=nama?nama.split(',')[0].trim():'';
+
+  // Saat alamat terisi lengkap: bentuk PERTAMA = alamat lengkap + kota
+  // (street-first: "Jalan ..., Kelurahan, Kecamatan, Kota") — bentuk paling alami utk Nominatim,
+  // supaya tombol cari menemukan titik persis alamat yang diisikan secara online
+  if(alamat&&kota) push(alamat+', '+kota);
   if(nama&&alamat) push(nama+', '+alamat);
   if(alamat) push(alamat);
   if(nama) push(nama);
   // Strip bagian depan alamat satu per satu (jalan biasanya membuat pencarian gagal)
   if(alamat){
     const bagian=alamat.split(',').map(p=>p.trim()).filter(Boolean);
-    for(let i=1;i<bagian.length;i++) push(bagian.slice(i).join(', '));
+    for(let i=1;i<bagian.length;i++){
+      push(bagian.slice(i).join(', '));
+      if(kota) push(bagian.slice(i).join(', ')+', '+kota);
+    }
   }
-  // Ambil kota dari title "Kota, Provinsi, Indonesia"
-  if(nama){
-    const kota=nama.split(',')[0].trim();
-    if(kota) push(kota+', Indonesia');
-  }
+  // Kota dari title "Kota, Provinsi, Indonesia"
+  if(kota) push(kota+', Indonesia');
   // Batasi maksimal 6 query agar tidak spam Nominatim
   return list.slice(0,6);
 }
@@ -470,8 +478,18 @@ async function cariKoordinat(){
     const fmt=formatAlamat(found.address, found.display_name);
     if(fmt.title) $('nama').value=fmt.title;
     if(fmt.alamat) $('alamat').value=fmt.alamat;
+    // Bug #24: simpan titik jangkar alamat terisi — dipakai "Lokasi acak terdekat"
+    // supaya titik acak selalu dalam radius alamat terisi & tidak keluar kecamatan
+    jangkar={
+      lat:parseFloat(found.lat),
+      lng:parseFloat(found.lon),
+      kecamatan:ambilKecamatan(found.address),
+      sumber:'cari: "'+usedQuery+'"'
+    };
     exifNote=' (lokasi via: "'+usedQuery+'")';
-    setStatus('✅ Lokasi ditemukan lewat pencarian: "'+usedQuery+'". Gunakan "Lokasi acak terdekat" untuk variasi titik.');
+    setStatus(jangkar.kecamatan
+      ?'✅ Titik alamat ditemukan online: "'+usedQuery+'". Kecamatan: '+jangkar.kecamatan+' — tombol "Lokasi acak terdekat" dikunci di kecamatan ini.'
+      :'✅ Lokasi ditemukan lewat pencarian: "'+usedQuery+'". Gunakan "Lokasi acak terdekat" untuk variasi titik.');
     if(img) render();
   }else{
     const msg=lastErr
@@ -500,25 +518,83 @@ function offsetAcak(lat,lng,minM,maxM){
   return {lat:nLat, lng:nLng};
 }
 
+/* ---------- Bug #22 + #24: Lokasi acak — selalu dalam radius alamat terisi,
+   dikunci di kecamatan yang sama (diverifikasi online via reverse-geocode) ---------- */
 async function cariLokasiAcak(){
   const k=ambilKoordinat();
   if(k.err){ alert(k.err); return; }
   const btn=$('btnAcak'); if(btn) btn.disabled=true;
+  const btnC=$('btnCari'), btnR=$('btnReverse');
+  if(btnC) btnC.disabled=true; if(btnR) btnR.disabled=true;
+  const selesai=()=>setTimeout(()=>{ if(btn)btn.disabled=false; if(btnC)btnC.disabled=false; if(btnR)btnR.disabled=false; },1100);
   const radius=parseInt($('radiusAcak').value,10)||100;
-  const minM=Math.max(5,Math.round(radius*0.2));     // minimal 20% dari radius supaya benar-benar berpindah
-  const maxM=radius;
-  const baru=offsetAcak(k.lat,k.lng,minM,maxM);
 
-  $('lat').value=baru.lat.toFixed(6);
-  $('lng').value=baru.lng.toFixed(6);
-  exifNote=` (titik acak ${minM}\u2013${maxM} m dari koordinat sebelumnya)`;
-  setStatus(`🎲 Titik acak dibuat (${minM}\u2013${maxM} m). Mencari alamat terdekat...`);
-  if(img) render();
+  // Bug #24: basis = titik jangkar alamat terisi (hasil tombol cari / reverse),
+  // BUKAN koordinat sekarang — supaya semua titik acak berada dalam radius alamat yang diisikan
+  const adaJangkar=!!(jangkar&&jangkar.kecamatan);
+  const base=adaJangkar?{lat:jangkar.lat,lng:jangkar.lng}:k;
+  const kec=adaJangkar?jangkar.kecamatan:'';
 
-  // Reverse-geocode supaya alamat & metadata cocok dengan koordinat acak baru
-  await delay(400);
-  await cariAlamat();
-  if(btn) btn.disabled=false;
+  // Belum ada jangkar kecamatan: perilaku lama — offset dari koordinat sekarang lalu reverse
+  // (reverse sekaligus men-set jangkar, jadi klik berikutnya otomatis terkunci kecamatan)
+  if(!adaJangkar){
+    const minM=Math.max(5,Math.round(radius*0.2));   // minimal 20% dari radius supaya benar-benar berpindah
+    const maxM=radius;
+    const baru=offsetAcak(k.lat,k.lng,minM,maxM);
+    $('lat').value=baru.lat.toFixed(6);
+    $('lng').value=baru.lng.toFixed(6);
+    exifNote=` (titik acak ${minM}\u2013${maxM} m dari koordinat sebelumnya)`;
+    setStatus(`🎲 Titik acak dibuat (${minM}\u2013${maxM} m). Mencari alamat terdekat...`);
+    if(img) render();
+    await delay(400);
+    await cariAlamat();
+    selesai();
+    return;
+  }
+
+  // Ada jangkar: uji kandidat satu per satu — terima kalau reverse-geocode online
+  // meyakinkan kandidat MASIH di kecamatan yang sama dgn alamat terisi
+  // Tahap: [fraksi radius min, fraksi max, jumlah kandidat] — radius mengecil kalau kandidat keluar kecamatan
+  const tahap=[[0.20,1.00,2],[0.10,0.50,2],[0.05,0.20,1],[0.01,0.05,1]];
+  let diterima=null, hasilReverse=null, rentang='';
+  setStatus(`🎲 Membuat titik acak — dikunci di kecamatan ${kec}...`);
+
+  for(const [fMin,fMax,nCoba] of tahap){
+    for(let n=0;n<nCoba;n++){
+      const minM=Math.max(5,Math.round(radius*fMin));
+      const maxM=Math.max(minM+2,Math.round(radius*fMax));
+      const cand=offsetAcak(base.lat,base.lng,minM,maxM);
+      setStatus(`🎲 Menguji titik acak ${minM}\u2013${maxM} m dari titik alamat (kecamatan ${kec})...`);
+      try{
+        const res=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${cand.lat.toFixed(6)}&lon=${cand.lng.toFixed(6)}&addressdetails=1&zoom=18&accept-language=id`);
+        if(!res.ok) throw new Error('HTTP '+res.status);
+        const data=await res.json();
+        if(data&&data.address&&samaNama(ambilKecamatan(data.address),kec)){
+          diterima=cand; hasilReverse=data; rentang=`${minM}\u2013${maxM}`;
+          break;
+        }
+      }catch(err){ /* gagal jaringan: coba kandidat berikutnya */ }
+      await delay(1150);   // hormati batas 1 request/detik Nominatim
+    }
+    if(diterima) break;
+  }
+
+  if(diterima&&hasilReverse){
+    // Kandidat lolos uji kecamatan -> pakai + isi alamat dari hasil reverse-geocode
+    // (jangkar TIDAK dipindah — klik acak berikutnya tetap dalam radius alamat awal)
+    $('lat').value=diterima.lat.toFixed(6);
+    $('lng').value=diterima.lng.toFixed(6);
+    const fmt=formatAlamat(hasilReverse.address, hasilReverse.display_name);
+    if(fmt.title) $('nama').value=fmt.title;
+    if(fmt.alamat) $('alamat').value=fmt.alamat;
+    exifNote=` (titik acak ${rentang} m dari titik alamat terisi, masih di kecamatan ${kec})`;
+    setStatus(`✅ Titik acak ${rentang} m dari titik alamat — masih di kecamatan ${kec}. Alamat diperbarui otomatis.`);
+    if(img) render();
+  }else{
+    // Semua kandidat keluar kecamatan / jaringan gagal -> JANGAN pindah titik (aman utk metadata)
+    setStatus(`⚠️ Titik acak tidak bisa dibuat di dalam kecamatan ${kec} — titik terlalu dekat batas kecamatan atau jaringan sibuk. Koordinat tidak diubah. Coba radius lebih kecil.`);
+  }
+  selesai();
 }
 
 // Bug #20: Reverse geocode — dari koordinat ke alamat lengkap (Nominatim)
@@ -541,8 +617,15 @@ async function cariAlamat(){
         $('lat').value=parseFloat(data.lat).toFixed(6);
         $('lng').value=parseFloat(data.lon).toFixed(6);
       }
+      // Bug #24: titik jangkar ikut alamat yang baru terisi (GPS / reverse / upload)
+      jangkar={
+        lat:(data.lat!=null&&isFinite(parseFloat(data.lat))?parseFloat(data.lat):k.lat),
+        lng:(data.lon!=null&&isFinite(parseFloat(data.lon))?parseFloat(data.lon):k.lng),
+        kecamatan:ambilKecamatan(data.address),
+        sumber:'reverse-geocode'
+      };
       exifNote=' (alamat lengkap dari reverse-geocode OpenStreetMap)';
-      setStatus('✅ Alamat lengkap ditemukan dari koordinat!');
+      setStatus('✅ Alamat lengkap ditemukan dari koordinat!'+(jangkar.kecamatan?' (kecamatan: '+jangkar.kecamatan+')':''));
       if(img) render();
     }else{
       setStatus('⚠️ Alamat tidak ditemukan untuk koordinat ini. Coba zoom lebih dekat atau koordinat lain.');
@@ -551,6 +634,25 @@ async function cariAlamat(){
     setStatus('⚠️ Gagal mencari alamat ('+err.message+'). Periksa koneksi atau coba lagi sebentar lagi.');
   }
   setTimeout(()=>{btn.disabled=false; if(btnC) btnC.disabled=false;},1100);
+}
+
+/* ---------- Bug #24: kunci kecamatan untuk lokasi acak ---------- */
+// Ambil nama kecamatan dari objek address Nominatim (prioritas sama dgn formatAlamat)
+function ambilKecamatan(addr){
+  if(!addr) return '';
+  if(addr.city_district) return addr.city_district;
+  if(addr.county) return addr.county;
+  if(addr.state_district) return addr.state_district;
+  return '';
+}
+// Bandingkan dua nama wilayah — case-insensitive, abaikan prefiks kecamatan/kota/kabupaten
+function samaNama(a,b){
+  const norm=s=>String(s||'').toLowerCase()
+    .replace(/^kecamatan\s+/,'').replace(/^kota\s+/,'').replace(/^kabupaten\s+/,'')
+    .replace(/\s+/g,' ').trim();
+  const na=norm(a), nb=norm(b);
+  if(!na||!nb) return false;
+  return na===nb;
 }
 
 // Bug #20: Format alamat dari objek address Nominatim ke format Indonesia
@@ -584,7 +686,7 @@ function formatAlamat(addr, displayName){
   // Kelurahan: suburb (印尼 Nominatim field untuk kelurahan/desa urban)
   const kelurahan = pick(addr)(['suburb','borough','subdistrict','village_subdivision']);
   // Kecamatan: city_district (印尼 field untuk kecamatan); fallback county (yang kadang juga kecamatan)
-  const kecamatan = pick(addr)(['city_district','county','state_district']);
+  const kecamatan = ambilKecamatan(addr);
   // Kota: city/town/municipality/village (village untuk desa di Jawa/pedesaan)
   const kota = pick(addr)(['city','town','municipality','village']);
   // Kabupaten: county (jika berbeda dari kecamatan)

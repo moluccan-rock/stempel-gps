@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#02030a">
 <title>Stempel Geotag Foto + Peta (Auto EXIF Inject)</title>
 <!-- Library membaca EXIF -->
 <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
@@ -10,24 +11,17 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/piexifjs/1.0.6/piexif.min.js"></script>
 <style>
  :root{
-  --bg:#f3f5f7; --surface:#ffffff; --text:#0f172a; --muted:#475569; --border:#cbd5e1;
-  --primary:#0f766e; --primary-h:#115e59; --primary-fg:#ffffff;
-  --neutral:#475569; --neutral-h:#334155;
-  --success:#15803d; --success-h:#166534;
-  --info-bg:#ecfdf5; --info-bd:#a7f3d0; --focus:#2563eb;
-  --radius:12px; --shadow:0 1px 2px rgba(15,23,42,.06),0 4px 14px rgba(15,23,42,.06);
- }
- @media (prefers-color-scheme:dark){
-  :root{
-   --bg:#0b1220; --surface:#111a2b; --text:#e5e9f0; --muted:#a3afc2; --border:#2a3850;
-   --primary:#2dd4bf; --primary-h:#5eead4; --primary-fg:#04201d;
-   --neutral:#64748b; --neutral-h:#7b8aa0;
-   --success:#4ade80; --success-h:#86efac;
-   --info-bg:#0d2a24; --info-bd:#1f5b4d; --focus:#60a5fa;
-   --shadow:0 1px 2px rgba(0,0,0,.4);
-  }
+  --bg:#02030a; --surface:rgba(14,22,38,.93); --text:#e5e9f0; --muted:#a3afc2; --border:#2a3850;
+  --primary:#2dd4bf; --primary-h:#5eead4; --primary-fg:#04201d;
+  --neutral:#475569; --neutral-h:#64748b;
+  --success:#4ade80; --success-h:#86efac;
+  --info-bg:#0d2a24; --info-bd:#1f5b4d; --focus:#60a5fa;
+  --radius:12px; --shadow:0 1px 2px rgba(0,0,0,.5);
  }
  *{box-sizing:border-box}
+ #bg{position:fixed;inset:0;width:100%;height:100%;z-index:-1;display:block}
+ #btnStar{min-height:36px;padding:6px 12px;font-size:.8125rem;margin-top:10px}
+ html{background:#02030a}
  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:16px;line-height:1.5;
   max-width:720px;margin:0 auto;padding:16px 16px 40px;background:var(--bg);color:var(--text)}
  header.top{margin:8px 0 16px}
@@ -54,9 +48,8 @@
  button svg{width:18px;height:18px;flex:none}
  button.sec{background:var(--neutral);color:#fff}
  button.sec:hover{background:var(--neutral-h)}
- button.dl{background:var(--success);color:#fff}
+ button.dl{background:var(--success);color:#052e16}
  button.dl:hover{background:var(--success-h)}
- @media (prefers-color-scheme:dark){button.dl{color:#052e16}}
  button:disabled{opacity:.45;cursor:not-allowed}
  button:disabled:active{transform:none}
  hr{border:0;border-top:1px dashed var(--border);margin:16px 0}
@@ -69,12 +62,14 @@
 </style>
 </head>
 <body>
+<canvas id="bg" aria-hidden="true"></canvas>
 <header class="top">
  <h1>
   <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
   Stempel Geotag Foto + Peta
  </h1>
  <p>Stempel visual di gambar, plus metadata EXIF yang sama di dalam file.</p>
+ <button type="button" class="sec" id="btnStar" aria-pressed="true">Animasi bintang: nyala</button>
 </header>
 
 <section class="card" aria-labelledby="h-foto">
@@ -576,6 +571,91 @@ const jadwal=()=>{
   $(id).addEventListener('input',jadwal);
   $(id).addEventListener('change',jadwal);
 });
+</script>
+<script>
+/* ===== Latar bintang (ringan: canvas 2D, 30 fps, berhenti saat tab tersembunyi) ===== */
+(()=>{
+'use strict';
+const HOLD=30000, FADE=3000, FPS=30;
+const MAXSTARS=520;     // batas jumlah bintang (dulu 260)
+const DENSITY=4500;     // px² per bintang (dulu 9000) -> bintang 2x lebih banyak
+const DPR_MAX=1.5;
+const SCENES=[
+  {k:1.0,rgb:'255,255,255',vx:-4,vy: 0},
+  {k:0.7,rgb:'190,210,255',vx: 0,vy: 3},
+  {k:1.3,rgb:'255,236,208',vx: 3,vy:-2},
+  {k:0.9,rgb:'212,226,255',vx:-2,vy:-3}
+];
+const cv=document.getElementById('bg'), ctx=cv.getContext('2d',{alpha:false});
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const tog=document.getElementById('btnStar');
+let on=!reduce;
+try{ if(localStorage.getItem('bintang')==='off') on=false; }catch(e){}
+let W=0,H=0,stars=[],scene=0,sceneT=0,tt=0,last=0,raf=0;
+
+function build(){
+  const s=SCENES[scene];
+  const n=Math.min(MAXSTARS,Math.max(60,Math.round(W*H/DENSITY*s.k)));
+  stars=[];
+  for(let i=0;i<n;i++){
+    const q=Math.random();
+    stars.push({x:Math.random()*W,y:Math.random()*H,
+      r:q<.78?.6+Math.random()*.5:q<.96?1.1+Math.random()*.5:1.7+Math.random()*.6,
+      a:.35+Math.random()*.65,sp:.4+Math.random()*1.6,ph:Math.random()*6.283,z:.4+Math.random()*.6});
+  }
+}
+function resize(){
+  const dpr=Math.min(window.devicePixelRatio||1,DPR_MAX);
+  W=innerWidth;H=innerHeight;
+  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  build();draw(1,true);
+}
+function draw(g,still){
+  const s=SCENES[scene];
+  ctx.globalAlpha=1;ctx.fillStyle='#02030a';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='rgb('+s.rgb+')';
+  for(let i=0;i<stars.length;i++){
+    const st=stars[i];
+    ctx.globalAlpha=st.a*(still?1:.55+.45*Math.sin(tt*st.sp+st.ph))*g;
+    if(st.r<1) ctx.fillRect(st.x,st.y,st.r*2,st.r*2);
+    else{ctx.beginPath();ctx.arc(st.x,st.y,st.r,0,6.2832);ctx.fill();}
+  }
+  ctx.globalAlpha=1;
+}
+function frame(ts){
+  raf=requestAnimationFrame(frame);
+  if(!last)last=ts;
+  const d=ts-last;
+  if(d<1000/FPS-1)return;
+  last=ts;
+  const dt=Math.min(d,100)/1000;
+  tt+=dt;sceneT+=dt*1000;
+  if(sceneT>=HOLD){scene=(scene+1)%SCENES.length;sceneT=0;build();}
+  const s=SCENES[scene],half=FADE/2;
+  let g=1;
+  if(sceneT<half)g=sceneT/half;else if(sceneT>HOLD-half)g=(HOLD-sceneT)/half;
+  for(let i=0;i<stars.length;i++){
+    const st=stars[i];
+    st.x+=s.vx*st.z*dt;st.y+=s.vy*st.z*dt;
+    if(st.x<0)st.x+=W;else if(st.x>W)st.x-=W;
+    if(st.y<0)st.y+=H;else if(st.y>H)st.y-=H;
+  }
+  draw(g,false);
+}
+function start(){if(!on||raf)return;last=0;raf=requestAnimationFrame(frame);}
+function stop(){if(raf){cancelAnimationFrame(raf);raf=0;}}
+function label(){ if(tog){tog.textContent='Animasi bintang: '+(on?'nyala':'mati');tog.setAttribute('aria-pressed',on?'true':'false');} }
+if(tog) tog.onclick=()=>{
+  on=!on;
+  try{localStorage.setItem('bintang',on?'on':'off');}catch(e){}
+  label();
+  if(on)start();else{stop();draw(1,true);}
+};
+document.addEventListener('visibilitychange',()=>{document.hidden?stop():start();});
+let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(resize,200);});
+label();resize();start();
+})();
 </script>
 </body>
 </html>

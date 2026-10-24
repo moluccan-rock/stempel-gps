@@ -118,17 +118,11 @@
   <div><label for="zoom">Zoom peta</label>
    <select id="zoom"><option>13</option><option>14</option><option selected>15</option><option>16</option><option>17</option></select>
   </div>
-  <div><label for="radiusAcak">Radius acak</label>
-   <select id="radiusAcak">
-    <option value="50">± 50 m</option>
-    <option value="100" selected>± 100 m</option>
-    <option value="250">± 250 m</option>
-    <option value="500">± 500 m</option>
-    <option value="1000">± 1 km</option>
-   </select>
+  <div><label>Radius acak</label>
+   <div id="radiusAcak" style="padding:.46rem .6rem;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);border-radius:6px;color:#cfd9e6;font-size:.82rem">100 – 200 m</div>
   </div>
  </div>
- <p class="hint">"Lokasi acak terdekat" membuat titik baru dalam radius dari titik alamat yang dicari — dan tiap kandidat diuji online (reverse-geocode) supaya tetap berada di kecamatan yang sama dengan alamat terisi. Kalau semua kandidat keluar kecamatan (dekat batas), koordinat tidak diubah. Berguna supaya setiap foto tidak berkoordinat persis sama.</p>
+ <p class="hint">"Lokasi acak terdekat" membuat titik baru <b>100–200 m</b> dari titik alamat yang dicari — tiap kandidat diuji online (reverse-geocode) supaya tetap di kecamatan yang sama dengan alamat terisi. Kalau kandidat keluar kecamatan (dekat batas), radius mengecil otomatis (50–100 → 20–50 → 5–20 m); kalau tetap gagal, koordinat tidak diubah. Berguna supaya setiap foto tidak berkoordinat persis sama.</p>
 </section>
 
 <section class="card" aria-labelledby="h-waktu">
@@ -171,7 +165,7 @@
 <section class="card" aria-labelledby="h-hasil">
  <h2 id="h-hasil">5 · Hasil</h2>
  <div class="actions" style="margin-top:8px">
-  <button type="button" id="btnBuat" onclick="render()">
+  <button type="button" id="btnBuat" onclick="buatGeotag()">
    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
    Buat geotag
   </button>
@@ -180,6 +174,7 @@
    Download JPG + EXIF
   </button>
  </div>
+ <p class="hint" style="margin-top:8px">Klik <b>"Buat geotag"</b> untuk menerapkan & mempratinjau metadata sesuai form saat ini (alamat, koordinat, tanggal-jam, note, kamera) — panel di bawah menampilkan metadata yang akan tertanam. Setelah cocok, klik <b>"Download JPG + EXIF"</b> untuk menyimpan.</p>
  <span id="st" role="status" aria-live="polite"></span>
  <div id="meta"></div>
 </section>
@@ -201,6 +196,12 @@ let originalExif=null;              // Bug #13: simpan EXIF penuh dari foto asli
 let exifNote='';
 let jangkar=null;   // Bug #24: titik jangkar = titik alamat yang terisi (hasil cari/reverse) — kunci kecamatan utk lokasi acak
 const tileCache=new Map();
+
+// Bug #25: nilai default placeholder input nama/alamat — dipakai utk mendeteksi "sudah diketik user"
+const DEFAULT_NAMA='Ambon, Maluku, Indonesia';
+const DEFAULT_ALAMAT='Jalan, RT/RW, Kelurahan, Kecamatan, Kota';
+// Field dianggap "sudah diisi user" kalau tidak kosong DAN bukan placeholder default
+function sudahDiisi(v, def){ const s=(v||'').trim(); return !!s && s!==def; }
 
 function setStatus(t){ $('st').textContent=t; }
 
@@ -476,8 +477,10 @@ async function cariKoordinat(){
     $('lat').value=parseFloat(found.lat).toFixed(6);
     $('lng').value=parseFloat(found.lon).toFixed(6);
     const fmt=formatAlamat(found.address, found.display_name);
-    if(fmt.title) $('nama').value=fmt.title;
-    if(fmt.alamat) $('alamat').value=fmt.alamat;
+    // Bug #25: alamat & nama yang sudah diketik user TIDAK ditimpa hasil Nominatim —
+    // supaya metadata foto persis sama dgn yang diketik. Hanya isi kalau masih kosong/placeholder.
+    if(!sudahDiisi($('nama').value,DEFAULT_NAMA) && fmt.title) $('nama').value=fmt.title;
+    if(!sudahDiisi($('alamat').value,DEFAULT_ALAMAT) && fmt.alamat) $('alamat').value=fmt.alamat;
     // Bug #24: simpan titik jangkar alamat terisi — dipakai "Lokasi acak terdekat"
     // supaya titik acak selalu dalam radius alamat terisi & tidak keluar kecamatan
     jangkar={
@@ -518,7 +521,7 @@ function offsetAcak(lat,lng,minM,maxM){
   return {lat:nLat, lng:nLng};
 }
 
-/* ---------- Bug #22 + #24: Lokasi acak — selalu dalam radius alamat terisi,
+/* ---------- Bug #22 + #24 + #25: Lokasi acak — radius tetap 100–200 m dari titik alamat,
    dikunci di kecamatan yang sama (diverifikasi online via reverse-geocode) ---------- */
 async function cariLokasiAcak(){
   const k=ambilKoordinat();
@@ -527,7 +530,6 @@ async function cariLokasiAcak(){
   const btnC=$('btnCari'), btnR=$('btnReverse');
   if(btnC) btnC.disabled=true; if(btnR) btnR.disabled=true;
   const selesai=()=>setTimeout(()=>{ if(btn)btn.disabled=false; if(btnC)btnC.disabled=false; if(btnR)btnR.disabled=false; },1100);
-  const radius=parseInt($('radiusAcak').value,10)||100;
 
   // Bug #24: basis = titik jangkar alamat terisi (hasil tombol cari / reverse),
   // BUKAN koordinat sekarang — supaya semua titik acak berada dalam radius alamat yang diisikan
@@ -535,11 +537,10 @@ async function cariLokasiAcak(){
   const base=adaJangkar?{lat:jangkar.lat,lng:jangkar.lng}:k;
   const kec=adaJangkar?jangkar.kecamatan:'';
 
-  // Belum ada jangkar kecamatan: perilaku lama — offset dari koordinat sekarang lalu reverse
+  // Belum ada jangkar kecamatan: offset 100–200 m dari koordinat sekarang lalu reverse
   // (reverse sekaligus men-set jangkar, jadi klik berikutnya otomatis terkunci kecamatan)
   if(!adaJangkar){
-    const minM=Math.max(5,Math.round(radius*0.2));   // minimal 20% dari radius supaya benar-benar berpindah
-    const maxM=radius;
+    const minM=100, maxM=200;
     const baru=offsetAcak(k.lat,k.lng,minM,maxM);
     $('lat').value=baru.lat.toFixed(6);
     $('lng').value=baru.lng.toFixed(6);
@@ -553,16 +554,14 @@ async function cariLokasiAcak(){
   }
 
   // Ada jangkar: uji kandidat satu per satu — terima kalau reverse-geocode online
-  // meyakinkan kandidat MASIH di kecamatan yang sama dgn alamat terisi
-  // Tahap: [fraksi radius min, fraksi max, jumlah kandidat] — radius mengecil kalau kandidat keluar kecamatan
-  const tahap=[[0.20,1.00,2],[0.10,0.50,2],[0.05,0.20,1],[0.01,0.05,1]];
+  // meyakinkan kandidat MASIH di kecamatan yang sama dgn alamat terisi.
+  // Bug #25: radius tetap 100–200 m; mengecil otomatis kalau kandidat keluar kecamatan (dekat batas).
+  const tahap=[[100,200,2],[50,100,2],[20,50,1],[5,20,1]];
   let diterima=null, hasilReverse=null, rentang='';
-  setStatus(`🎲 Membuat titik acak — dikunci di kecamatan ${kec}...`);
+  setStatus(`🎲 Membuat titik acak 100\u2013200 m dari titik alamat — dikunci di kecamatan ${kec}...`);
 
-  for(const [fMin,fMax,nCoba] of tahap){
+  for(const [minM,maxM,nCoba] of tahap){
     for(let n=0;n<nCoba;n++){
-      const minM=Math.max(5,Math.round(radius*fMin));
-      const maxM=Math.max(minM+2,Math.round(radius*fMax));
       const cand=offsetAcak(base.lat,base.lng,minM,maxM);
       setStatus(`🎲 Menguji titik acak ${minM}\u2013${maxM} m dari titik alamat (kecamatan ${kec})...`);
       try{
@@ -581,7 +580,7 @@ async function cariLokasiAcak(){
 
   if(diterima&&hasilReverse){
     // Kandidat lolos uji kecamatan -> pakai + isi alamat dari hasil reverse-geocode
-    // (jangkar TIDAK dipindah — klik acak berikutnya tetap dalam radius alamat awal)
+    // (alamat diperbarui supaya cocok dgn koordinat acak baru — metadata tetap konsisten utk ESDM PKH)
     $('lat').value=diterima.lat.toFixed(6);
     $('lng').value=diterima.lng.toFixed(6);
     const fmt=formatAlamat(hasilReverse.address, hasilReverse.display_name);
@@ -592,7 +591,7 @@ async function cariLokasiAcak(){
     if(img) render();
   }else{
     // Semua kandidat keluar kecamatan / jaringan gagal -> JANGAN pindah titik (aman utk metadata)
-    setStatus(`⚠️ Titik acak tidak bisa dibuat di dalam kecamatan ${kec} — titik terlalu dekat batas kecamatan atau jaringan sibuk. Koordinat tidak diubah. Coba radius lebih kecil.`);
+    setStatus(`⚠️ Titik acak tidak bisa dibuat di dalam kecamatan ${kec} — titik terlalu dekat batas kecamatan atau jaringan sibuk. Koordinat tidak diubah.`);
   }
   selesai();
 }
@@ -1069,13 +1068,16 @@ function verifikasi(newJpeg,m){
   }catch(err){ return {ok:false,error:err.message}; }
 }
 
-function unduh(){
-  if($('btnDl').disabled||!lastMeta){ setStatus('⏳ Tunggu proses selesai dulu, lalu download.'); return; }
+/* ---------- Bug #25: "Buat geotag" = pratinjau metadata sebelum download ----------
+   Dipecah jadi prosesMeta(simpan) supaya tombol "Buat geotag" bisa menampilkan
+   metadata yang akan tertanam SEBELUM disimpan — user bisa verifikasi & sesuaikan dulu. ---------- */
+let metaSibuk=false;
+async function prosesMeta(simpan){
+  if(metaSibuk) return false;
+  metaSibuk=true;
+  $('btnDl').disabled=true;
   const m=lastMeta;
-  const nama=`Geotag_${m.w.Y}-${two(m.w.M)}-${two(m.w.D)}_${two(m.w.h)}${two(m.w.mi)}.jpg`;
-  setStatus('⏳ Menanamkan (injecting) EXIF & mengunduh...');
   const jpegData=cv.toDataURL('image/jpeg',JPEG_QUALITY);
-
   try{
     let bytes,offsetOk=true;
     try{ bytes=bangunExif(m,true); }
@@ -1083,7 +1085,10 @@ function unduh(){
 
     const newJpeg=piexif.insert(bytes,jpegData);
     const hasil=verifikasi(newJpeg,m);
-    simpanBlob(dataURLtoBlob(newJpeg),nama);
+    if(simpan){
+      const nama=`Geotag_${m.w.Y}-${two(m.w.M)}-${two(m.w.D)}_${two(m.w.h)}${two(m.w.mi)}.jpg`;
+      simpanBlob(dataURLtoBlob(newJpeg),nama);
+    }
 
     // Baca kembali EXIF untuk ditampilkan ke user
     const r=piexif.load(newJpeg);
@@ -1111,12 +1116,14 @@ function unduh(){
     const totalTags=Object.keys(z).length+Object.keys(ex).length+Object.keys(gp).length;
 
     setStatus(hasil.ok
-      ?'✅ File diunduh. Metadata TERVERIFIKASI lengkap & tidak anomali.'
-      :'⚠️ File diunduh, tetapi pengecekan gagal: '+(hasil.failed?hasil.failed.join(', '):hasil.error));
+      ?(simpan
+        ?'✅ File diunduh. Metadata TERVERIFIKASI lengkap & tidak anomali.'
+        :'✅ Metadata siap & terverifikasi. Klik "Download JPG + EXIF" untuk menyimpan.')
+      :'⚠️ '+(simpan?'File diunduh, ':'')+'pengecekan gagal: '+(hasil.failed?hasil.failed.join(', '):hasil.error));
 
     const el=$('meta'); el.style.display='block';
     el.textContent=
-      `── METADATA TERTANAM DI FILE ──\n`+
+      (simpan?'── METADATA TERTANAM DI FILE ──':'── METADATA YANG AKAN DITANAM ──')+'\n'+
       `📷 Kamera      : ${mk} ${md}\n`+
       `🔧 Software    : ${sw}\n`+
       `📐 Resolusi    : ${m.W}×${m.H}px  |  Orientasi: normal (1)\n`+
@@ -1132,12 +1139,38 @@ function unduh(){
       `✅ Total tags  : ${totalTags} (${Object.keys(z).length} IFD0, ${Object.keys(ex).length} Exif, ${Object.keys(gp).length} GPS)\n`+
       `────────────────────────────────\n`+
       (hasil.ok?'✅ Verifikasi: LULUS (lat, lng, waktu, kamera, altitude, exposure semua cocok)':'⚠️ Verifikasi: '+hasil.failed.join(', '));
+    return hasil.ok;
   }catch(e){
     console.error('Gagal inject EXIF:',e);
-    simpanBlob(dataURLtoBlob(jpegData),nama);
-    setStatus('⚠️ Diunduh TANPA metadata (error inject: '+e.message+').');
+    if(simpan){
+      const nama=`Geotag_${m.w.Y}-${two(m.w.M)}-${two(m.w.D)}_${two(m.w.h)}${two(m.w.mi)}.jpg`;
+      simpanBlob(dataURLtoBlob(jpegData),nama);
+    }
+    setStatus(simpan?'⚠️ Diunduh TANPA metadata (error inject: '+e.message+').':'⚠️ Gagal membuat metadata (error: '+e.message+').');
     $('meta').style.display='none';
+    return false;
+  }finally{
+    metaSibuk=false;
+    $('btnDl').disabled=false;
   }
+}
+
+// Bug #25: tombol "Buat geotag" — render ulang dari form saat ini + pratinjau metadata
+async function buatGeotag(){
+  if(!img){ setStatus('⚠️ Pilih foto dulu sebelum buat geotag.'); return; }
+  const b=$('btnBuat'); if(b) b.disabled=true;
+  try{
+    setStatus('⏳ Membuat geotag dari form saat ini...');
+    await render();                 // render ulang -> lastMeta = snapshot nilai form sekarang
+    if(!lastMeta) return;            // render gagal (mis. koordinat invalid)
+    await prosesMeta(false);         // bangun EXIF + verifikasi + tampilkan panel (tanpa simpan)
+  }finally{ if(b) b.disabled=false; }
+}
+
+function unduh(){
+  if($('btnDl').disabled||!lastMeta){ setStatus('⏳ Klik "Buat geotag" dulu sebelum download.'); return; }
+  setStatus('⏳ Menanamkan (injecting) EXIF & mengunduh...');
+  prosesMeta(true);
 }
 
 let tmr;

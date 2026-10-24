@@ -283,14 +283,15 @@
 <div id="tabPdf" style="display:none" role="tabpanel" aria-labelledby="tabBtnPdf">
  <section class="card">
   <h2>1 · Pilih PDF</h2>
-  <label for="pdf" class="pdf-drop" id="pdfDrop">
+  <!-- Bug #30: div onclick langsung (bukan label+button) — klik mana saja di kotak ini = buka file picker -->
+  <div class="pdf-drop" id="pdfDrop" onclick="pdfPickerClick()" role="button" tabindex="0" aria-label="Pilih atau seret PDF" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pdfPickerClick();}">
    <svg class="pdf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6M9 9h2"/></svg>
    <p id="pdfDropHint">Pilih atau seret &amp; jatuhkan PDF di sini</p>
-   <button type="button" class="pick">Pilih PDF</button>
+   <span class="pick">Pilih PDF</span>
    <div class="picked" id="pdfPicked" style="display:none"></div>
-  </label>
+  </div>
   <input type="file" id="pdf" accept="application/pdf,.pdf" style="display:none">
-  <p class="hint" style="margin-top:8px">Cocok utk PDF hasil scan / dokumen dgn banyak gambar. Teks &amp; struktur PDF tetap utuh — hanya gambar JPEG tertanam yang direkompres.</p>
+  <p class="hint" style="margin-top:8px">Klik mana saja di kotak ungu di atas = langsung buka file picker. Cocok utk PDF hasil scan / dokumen dgn banyak gambar. Teks &amp; struktur PDF tetap utuh.</p>
  </section>
 
  <section class="card">
@@ -1577,6 +1578,14 @@ function switchTab(name){
   }
 }
 
+// Bug #30: klik mana saja di kotak drop = langsung buka file picker (sebelumnya label+button
+// tidak memicu klik file input saat tombol diklik — user harus klik di luar tombol dulu).
+function pdfPickerClick(){
+  const inp=$('pdf');
+  inp.value='';          // reset supaya change event tetap fire saat user pilih file yg sama lagi
+  inp.click();           // langsung buka file picker di default folder device (browser-controlled)
+}
+
 // PDF: drag & drop handler
 (function(){
   const drop=$('pdfDrop');
@@ -1648,6 +1657,33 @@ function pdfApplyRecompress(decoded, q, skala){
     d.dict.set(PDFName.of('Height'), PDFNumber.of(r.h));
     d.dict.set(PDFName.of('Length'), PDFNumber.of(newBytes.length));
   }
+}
+
+// Bug #31: Pad PDF bytes supaya ukuran file PERSIS = targetBytes.
+// Pakai PDF comment (mulai dgn %, akhir newline) — ditaruh SETELAH %%EOF.
+// Spec PDF mengizinkan konten tambahan setelah %%EOF; mayoritas PDF reader tetap validasi file.
+// Pendekatan ini dijamin byte-exact tanpa harus save PDF ulang (cepat & deterministik).
+function padToExactSize(pdfBytes, targetBytes){
+  if(pdfBytes.length>=targetBytes) return pdfBytes;   // sudah >= target, tidak bisa pad
+  const deficit=targetBytes-pdfBytes.length;
+  if(deficit<=0) return pdfBytes;
+  // Bangun byte padding langsung (Uint8Array) — efisien bahkan utk deficit besar
+  const padBytes=new Uint8Array(deficit);
+  if(deficit>=3){
+    // Format: \n % X*(deficit-3) \n = total deficit byte
+    padBytes[0]=0x0a;        // \n
+    padBytes[1]=0x25;        // %
+    for(let i=2;i<deficit-1;i++) padBytes[i]=0x58;   // 'X'
+    padBytes[deficit-1]=0x0a;  // \n
+  }else if(deficit===2){
+    padBytes[0]=0x0a; padBytes[1]=0x0a;   // dua newline
+  }else{ // deficit === 1
+    padBytes[0]=0x0a;                       // satu newline
+  }
+  const result=new Uint8Array(pdfBytes.length+deficit);
+  result.set(pdfBytes, 0);
+  result.set(padBytes, pdfBytes.length);
+  return result;
 }
 
 // PDF: estimasi total byte JPEG bila direkompres pada q+skala
@@ -1742,12 +1778,22 @@ async function kompresPDF(){
     // 5. Save PDF baru dgn useObjectStreams
     $('pdfSt').textContent='⏳ Menyimpan PDF baru...';
     const pdfBytes=await pdfDoc.save({useObjectStreams:true, addDefaultPage:false});
-    pdfBlob=new Blob([pdfBytes], {type:'application/pdf'});
+    // Bug #31: pad hasil supaya ukuran file PERSIS = targetBytes (sesuai pilihan user, jangan dirubah)
+    const finalBytes=padToExactSize(pdfBytes, targetBytes);
+    pdfBlob=new Blob([finalBytes], {type:'application/pdf'});
     pdfSetBar(100);
 
     const base=(file.name||'dokumen.pdf').replace(/\.pdf$/i,'');
     namaHasilPdf=`${base}_kompres.pdf`;
-    const statusText = best.size<=targetBytes?'Tercapai':'Belum tercapai (best effort)';
+    // Status target: cek apakah hasil persis = target, kurang, atau kelebihan
+    let statusText;
+    if(finalBytes.length===targetBytes){
+      statusText='Tercapai PERSIS — file = '+targetBytes+' byte (sesuai pilihan)';
+    }else if(finalBytes.length<targetBytes){
+      statusText=`Tercapai (kurang ${targetBytes-finalBytes.length} byte — terlalu kecil utk padding)`;
+    }else{
+      statusText=`Belum tercapai (best effort — kelebihan ${finalBytes.length-targetBytes} byte, sudah kompres maksimal)`;
+    }
     pdfShowResult(file, pdfBlob, nImg, best.q, best.skala, statusText);
   }catch(err){
     console.error('Gagal kompres PDF:',err);

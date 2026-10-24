@@ -181,13 +181,14 @@
    <input id="resizeCustom" type="number" min="320" max="4096" step="10" value="1280" inputmode="numeric">
   </div>
  </div>
- <p class="hint" style="margin-top:8px">Foto kecil bisa <b>diperbesar</b> (upscale) dan foto besar bisa <b>diperkecil</b> (downscale) — tinggi mengikuti otomatis (rasio asli dipertahankan). "Asli" = tanpa resize (maks 2000 px). Upscale besar bisa terlihat agak lembut — gunakan seperlunya.</p>
+ <p class="hint" style="margin-top:8px">Foto kecil bisa <b>diperbesar</b> (upscale) dan foto besar bisa <b>diperkecil</b> (downscale) — tinggi mengikuti otomatis (rasio asli dipertahankan). "Asli" = tanpa resize (maks 2000 px). Catatan: ini atur dimensi pixel. Untuk <b>naikkan ukuran file di disk</b> (mis. 130 KB → 750 KB), pakai mode "Naikkan ke ≈ target" di bawah. Upscale dimensi besar bisa terlihat agak lembut — gunakan seperlunya.</p>
  <div class="row" style="margin-top:4px">
   <div><label for="ukuranMode">Target ukuran file</label>
    <select id="ukuranMode" onchange="toggleUkuranCustom()">
-    <option value="500">&lt; 500 KB</option>
-    <option value="1000" selected>&lt; 1 MB</option>
-    <option value="custom">Atur sendiri</option>
+    <option value="500">&lt; 500 KB (batas atas)</option>
+    <option value="1000" selected>&lt; 1 MB (batas atas)</option>
+    <option value="custom">Atur sendiri (batas atas)</option>
+    <option value="upscale">Naikkan ke ≈ target</option>
     <option value="0">Tanpa batas (kualitas penuh)</option>
    </select>
   </div>
@@ -202,7 +203,7 @@
    </select>
   </div>
  </div>
- <p class="hint" style="margin-top:8px">Urutan proses saat klik <b>"Buat geotag"</b>: (1) foto di-resize ke lebar target di atas (bisa perbesar/perkecil), (2) stempel geotag digambar, (3) file dikompresi (kualitas JPEG diturunkan; kalau masih kebesaran &amp; "Kecilkan dimensi" = Boleh, dimensi dikecilkan lagi) sampai di bawah target ukuran file. Pilih <b>"Tanpa batas"</b> utk kualitas penuh tanpa kompresi.</p>
+ <p class="hint" style="margin-top:8px">Urutan proses saat klik <b>"Buat geotag"</b>: (1) foto di-resize ke lebar target di atas (bisa perbesar/perkecil), (2) stempel geotag digambar, (3) ukuran file diproses sesuai mode: <b>batas atas</b> (kompresi kualitas+dimensi sampai di bawah target) / <b>Naikkan ke ≈ target</b> (kualitas &amp; dimensi dinaikkan utk mendekati target bila foto asli lebih kecil — mis. 130 KB → ≈ 750 KB) / <b>Tanpa batas</b> (kualitas penuh).</p>
  <div class="actions" style="margin-top:8px">
   <button type="button" id="btnBuat" onclick="buatGeotag()">
    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -355,7 +356,7 @@ async function muatGambar(file){
   });
 }
 
- $('foto').onchange=async e=>{
+$('foto').onchange=async e=>{
   const file=e.target.files[0];
   if(!file) return;
   const nama=(file.name||'').toLowerCase(), tipe=(file.type||'').toLowerCase();
@@ -1159,20 +1160,82 @@ function ukuranBytes(dataUrl){
   return Math.floor(b64.length*3/4)-pad;
 }
 // Baca target ukuran dari UI (KB). 0 = tanpa batas.
+// Bug #28: mode 'upscale' (naikkan ke target) pakai input custom juga.
 function ambilTargetKB(){
   const mode=$('ukuranMode')?$('ukuranMode').value:'1000';
   if(mode==='0') return 0;
-  if(mode==='custom'){
+  if(mode==='custom'||mode==='upscale'){
     const v=parseInt(String($('ukuranCustom')?$('ukuranCustom').value:'').trim(),10);
     if(isFinite(v)&&v>=50) return v;
     return 750;
   }
   const v=parseInt(mode,10); return isFinite(v)&&v>0?v:1000;
 }
-// Tampil/sembunyi input "atur sendiri"
+// Bug #28: baca mode operasi ukuran file: 'none' | 'upper' | 'upscale'.
+function ambilModeUkuran(){
+  const mode=$('ukuranMode')?$('ukuranMode').value:'1000';
+  if(mode==='0') return 'none';
+  if(mode==='upscale') return 'upscale';
+  return 'upper';
+}
+// Tampil/sembunyi input "atur sendiri" (dipakai utk custom & upscale)
 function toggleUkuranCustom(){
   const w=$('ukuranCustomWrap'); if(!w) return;
-  w.style.display=($('ukuranMode').value==='custom')?'block':'none';
+  const v=$('ukuranMode').value;
+  w.style.display=(v==='custom'||v==='upscale')?'block':'none';
+}
+
+/* ---------- Bug #28: Naikkan ukuran file ke ≈ targetBytes ----------
+   Dipakai saat foto asli lebih kecil dari target (mis. 130 KB → 750 KB).
+   Strategi bertahap:
+   1. Coba kualitas 0.95 pada dimensi saat ini — kalau sudah >= target, kembalikan.
+   2. Coba kualitas 1.0 pada dimensi saat ini — kalau sudah >= target, kembalikan.
+   3. Binary search skala dimensi 1.0..4.0 (cap 4096px) dgn q=1.0;
+      cari skala TERKECIL yang menghasilkan size >= target.
+   4. Kalau tidak ada skala yg lolos, kembalikan hasil skala terbesar (best effort).
+   Catatan: hanya berorientasi target JPEG canvas; EXIF ditambahkan di luar.
+   Penting: pilih hasil yg paling dekat dgn target — prefer >= target supaya
+   file benar-benar terlihat "di atas" target setelah EXIF disisipkan. ---------- */
+function naikkanKeTarget(targetBytes){
+  const srcW=cv.width, srcH=cv.height;
+  if(targetBytes<=0) return {dataUrl:cv.toDataURL('image/jpeg',JPEG_QUALITY),q:JPEG_QUALITY,w:srcW,h:srcH,sizeBytes:ukuranBytes(cv.toDataURL('image/jpeg',JPEG_QUALITY)),met:'noop'};
+  // Helper: ukur cv pada kualitas tertentu (dimensi sama)
+  const ukur=q=>{ const d=cv.toDataURL('image/jpeg',q); return {dataUrl:d, size:ukuranBytes(d)}; };
+  // Helper: render cv ke off-screen canvas pada skala tertentu, encode q=1.0
+  const ukurSkala=scale=>{
+    const nw=Math.min(4096,Math.max(1,Math.round(srcW*scale)));
+    const nh=Math.min(4096,Math.max(1,Math.round(srcH*nw/srcW)));
+    const off=document.createElement('canvas'); off.width=nw; off.height=nh;
+    const octx=off.getContext('2d');
+    octx.imageSmoothingEnabled=true;
+    if(octx.imageSmoothingQuality!==undefined) octx.imageSmoothingQuality='high';
+    gambarBerkualitas(octx, cv, nw, nh);   // resampling bertahap utk hasil mulus
+    const d=off.toDataURL('image/jpeg',1.0);
+    return {dataUrl:d, size:ukuranBytes(d), w:nw, h:nh};
+  };
+  // Stage 1: kualitas 0.95 lalu 1.0 pada dimensi saat ini
+  let r=ukur(0.95);
+  if(r.size>=targetBytes) return {dataUrl:r.dataUrl,q:0.95,w:srcW,h:srcH,sizeBytes:r.size,met:'upscale-q95'};
+  r=ukur(1.0);
+  if(r.size>=targetBytes) return {dataUrl:r.dataUrl,q:1.0,w:srcW,h:srcH,sizeBytes:r.size,met:'upscale-q100'};
+  // Stage 2: binary search skala dimensi 1.0..4.0 dgn q=1.0
+  let loS=1.0, hiS=4.0;
+  let best={dataUrl:r.dataUrl,q:1.0,w:srcW,h:srcH,sizeBytes:r.size,met:'upscale-floor'};
+  for(let i=0;i<7;i++){
+    const midS=(loS+hiS)/2;
+    const rs=ukurSkala(midS);
+    if(rs.size>=targetBytes){
+      hiS=midS;   // lolos — coba skala lebih kecil utk efisiensi
+      best={dataUrl:rs.dataUrl,q:1.0,w:rs.w,h:rs.h,sizeBytes:rs.size,met:'upscale-dimensi'};
+    }else{
+      loS=midS;   // belum lolos — naikkan skala
+      // Simpan kalau ini lebih dekat ke target daripada best sebelumnya
+      if(best.sizeBytes<targetBytes || rs.size>best.sizeBytes){
+        best={dataUrl:rs.dataUrl,q:1.0,w:rs.w,h:rs.h,sizeBytes:rs.size,met:'upscale-dimensi-floor'};
+      }
+    }
+  }
+  return best;
 }
 // Binary search kualitas JPEG [lo..hi] dgn callback measure(q)->{size,dataUrl}.
 // Kembalikan {q,sizeBytes,dataUrl,met} — q tertinggi yg <= budget, atau yg terkecil.
@@ -1234,18 +1297,25 @@ async function prosesMeta(simpan){
     try{ bytes=bangunExif(m,true); }
     catch(e){ offsetOk=false; bytes=bangunExif(m,false); }
 
-    // Bug #26: kompresi gambar sesuai target ukuran file (500 KB / 1 MB / atur sendiri)
+    // Bug #26 + #28: kontrol ukuran file — kompresi (batas atas) / naikkan (upscale) / tanpa batas
     const targetKB=ambilTargetKB();
+    const modeUkuran=ambilModeUkuran();
     const allowDownscale=($('bolehDownscale')&&$('bolehDownscale').value==='1');
     let jpegData, kompQ=JPEG_QUALITY, kompW=m.W, kompH=m.H, targetLabel='';
-    if(targetKB>0){
-      const budget=Math.max(8192, targetKB*1024 - (bytes.length+16));   // sisa utk canvas setelah EXIF
+    if(modeUkuran==='none'){
+      jpegData=cv.toDataURL('image/jpeg',JPEG_QUALITY);
+      targetLabel=' (tanpa batas, kualitas penuh)';
+    }else if(modeUkuran==='upscale'){
+      // Bug #28: naikkan ukuran file ke ≈ target bila foto asli lebih kecil
+      const budget=Math.max(8192, targetKB*1024 - (bytes.length+16));
+      const naik=naikkanKeTarget(budget);
+      jpegData=naik.dataUrl; kompQ=naik.q; kompW=naik.w; kompH=naik.h;
+      targetLabel=` (target ≈ ${targetKB} KB, mode naik)`;
+    }else{ // 'upper' — kompresi batas atas (default)
+      const budget=Math.max(8192, targetKB*1024 - (bytes.length+16));
       const komp=kompresiJPEG(budget, allowDownscale);
       jpegData=komp.dataUrl; kompQ=komp.q; kompW=komp.w; kompH=komp.h;
       targetLabel=` (target ≤ ${targetKB} KB)`;
-    }else{
-      jpegData=cv.toDataURL('image/jpeg',JPEG_QUALITY);
-      targetLabel=' (tanpa batas, kualitas penuh)';
     }
     // Kalau di-downscale, update dimensi EXIF supaya PixelXDimension cocok dgn gambar aktual
     if(kompW!==origW||kompH!==origH){
@@ -1290,13 +1360,18 @@ async function prosesMeta(simpan){
       ?` (resize ${m.resizeInfo.dariW}×${m.resizeInfo.dariH} → ${m.W}×${m.H}px, ${m.resizeInfo.arah} ${m.resizeInfo.faktor}×)`
      :'';
 
-    // Bug #26: indikator jelas apakah kompresi benar-benar jalan atau tidak
-    const dikompres = targetKB>0 && (kompQ < JPEG_QUALITY - 0.001 || kompW!==origW || kompH!==origH);
-    const kompStatus = targetKB===0
+    // Bug #26 + #28: indikator status ukuran file — kompresi / naikkan / tanpa batas
+    const dikompres = modeUkuran==='upper' && (kompQ < JPEG_QUALITY - 0.001 || kompW!==origW || kompH!==origH);
+    const diNaikkan = modeUkuran==='upscale' && (kompW>origW || kompH>origH || kompQ>JPEG_QUALITY+0.001);
+    const kompStatus = modeUkuran==='none'
       ? 'kualitas penuh (tanpa batas)'
-      : (dikompres
-        ? `q=${kompQ.toFixed(2)}${(kompW!==origW||kompH!==origH)?`, downscale ${origW}×${origH}→${kompW}×${kompH}px`:''}`
-        : 'tidak perlu — file sudah di bawah target');
+      : (modeUkuran==='upscale'
+        ? (diNaikkan
+          ? `q=${kompQ.toFixed(2)}${(kompW>origW||kompH>origH)?`, naik ${origW}×${origH}→${kompW}×${kompH}px`:''}`
+          : 'tidak perlu — file sudah di atas target')
+        : (dikompres
+          ? `q=${kompQ.toFixed(2)}${(kompW!==origW||kompH!==origH)?`, downscale ${origW}×${origH}→${kompW}×${kompH}px`:''}`
+          : 'tidak perlu — file sudah di bawah target'));
 
     setStatus(hasil.ok
       ?(simpan
@@ -1364,7 +1439,8 @@ const jadwal=()=>{
   clearTimeout(tmr);
   tmr=setTimeout(()=>{ exifNote=''; render(); },450);
 };
-['lat','lng','zoom','tgl','jam','tz','nama','alamat','note','make','model','alt','keepExif','keepImgDesc','resizeMode','resizeCustom'].forEach(id=>{
+// Bug #28: masukkan ukuranMode ke daftar listener supaya toggle "Naikkan ke ≈ target" me-render ulang
+['lat','lng','zoom','tgl','jam','tz','nama','alamat','note','make','model','alt','keepExif','keepImgDesc','resizeMode','resizeCustom','ukuranMode','ukuranCustom'].forEach(id=>{
   const el=$(id);
   if(!el) return;
   el.addEventListener('input',jadwal);

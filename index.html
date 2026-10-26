@@ -1,6 +1,5 @@
 <!DOCTYPE html>
-<html lang="id">
-<head>
+<html lang="id" __gcrremoteframetoken="61f2cd38c3489f96cf2202ea7f841149"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#02030a">
@@ -120,54 +119,50 @@
  .lock-btn{position:fixed;top:12px;right:12px;background:var(--surface);color:var(--muted);border:1px solid var(--border);padding:7px 12px;min-height:36px;border-radius:8px;font-size:.8rem;font-weight:600;z-index:100;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
  .lock-btn:hover{background:var(--primary);color:var(--primary-fg);border-color:var(--primary)}
  .lock-btn svg{width:14px;height:14px;flex:none}
+ /* Bug #36: kode akses */
+ .code-box{margin-top:12px;padding:12px;border:1px solid var(--info-bd);background:var(--info-bg);border-radius:8px}
+ .code-for{font-size:.8125rem;color:var(--muted);margin-bottom:8px}
+ .code-val{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:1.35rem;font-weight:800;letter-spacing:.08em;color:var(--primary-h);word-break:break-all;user-select:all;margin-bottom:10px}
+ .code-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px dashed var(--border);font-size:.875rem}
+ .code-row:first-child{border-top:0}
+ .code-info span{color:var(--muted);font-size:.8125rem}
+ .code-row button{min-height:36px;padding:6px 14px}
  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
 <canvas id="bg" aria-hidden="true"></canvas>
 
-<!-- Bug #32+33: Login overlay — password gate dgn 2 mode: setup (admin+user) & login tunggal -->
+<!-- Bug #36: Login overlay — 2 mode: login (password admin / kode akses) & blocked (situs ter-host belum aktif). Password dibuat admin di tab Pengaturan, bukan di layar login. -->
 <div id="loginOverlay" class="login-overlay" style="display:none">
  <div class="login-card">
-  <!-- LOGIN MODE: masukkan password (admin atau user) -->
-  <div id="loginMode">
+  <!-- LOGIN MODE: password admin ATAU kode akses dari admin -->
+  <div id="loginMode" style="display: block;">
    <h2>Masuk Aplikasi</h2>
-   <p>Masukkan password (admin atau user) untuk membuka aplikasi. Sistem auto-detect role.</p>
-   <label for="loginPass">Password</label>
-   <input type="password" id="loginPass" placeholder="Password admin atau user" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitLogin()">
+   <p>Masukkan <b>kode akses</b> yang diberikan admin. (Admin: masukkan password admin.)</p>
+   <label for="loginPass">Kode akses / password admin</label>
+   <input type="text" id="loginPass" placeholder="Kode akses dari admin" autocomplete="off" autocapitalize="characters" onkeydown="if(event.key==='Enter')submitLogin()" __gcruniqueid="1">
    <button type="button" onclick="submitLogin()">Masuk</button>
-   <p id="loginErr" class="login-err"></p>
-   <label class="chk"><input type="checkbox" id="loginShow" onchange="toggleLoginShow()"><span>Tampilkan password</span></label>
+   <p id="loginErr" class="login-err">⏳ Memverifikasi (PBKDF2 100k iter)...</p>
+   <label class="chk"><input type="checkbox" id="loginShow" onchange="toggleLoginShow()"><span>Tampilkan</span></label>
   </div>
-  <!-- SETUP MODE: first time — buat password admin + user -->
-  <div id="setupMode" style="display:none">
-   <h2>Buat Password</h2>
-   <p>Buat <b>password admin</b> (Anda — bisa ganti password kapan saja) + <b>password user</b> (untuk orang lain yang boleh pakai app tapi tidak bisa ganti password). Min 8 karakter. Disarankan campuran huruf besar/kecil/angka/simbol.</p>
-   <label for="setupAdminPass">Password Admin (Anda)</label>
-   <input type="password" id="setupAdminPass" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitSetup()">
-   <label for="setupAdminConfirm">Konfirmasi Password Admin</label>
-   <input type="password" id="setupAdminConfirm" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitSetup()">
-   <hr style="margin:14px 0;border-color:var(--border)">
-   <label for="setupUserPass">Password User (untuk orang lain)</label>
-   <input type="password" id="setupUserPass" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitSetup()">
-   <label for="setupUserConfirm">Konfirmasi Password User</label>
-   <input type="password" id="setupUserConfirm" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitSetup()">
-   <button type="button" onclick="submitSetup()">Buat Password</button>
-   <p id="setupErr" class="login-err"></p>
-   <label class="chk"><input type="checkbox" id="setupShow" onchange="toggleSetupShow()"><span>Tampilkan password</span></label>
+  <!-- BLOCKED MODE: situs ter-host tapi belum ada password/kode — setup dikunci -->
+  <div id="blockedMode" style="display:none">
+   <h2>Aplikasi Belum Aktif</h2>
+   <p>Aplikasi ini belum disiapkan oleh admin. Hubungi admin untuk mendapatkan link versi resmi beserta <b>kode akses</b> Anda.</p>
   </div>
  </div>
 </div>
 
 <!-- Bug #33: floating lock button — siapa saja (admin/user) bisa kunci app kapan saja -->
 <button type="button" class="lock-btn" onclick="lockApp()" title="Kunci aplikasi" aria-label="Kunci aplikasi">
- <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
  Kunci
 </button>
 
 <header class="top">
  <h1>
-  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
   Stempel Geotag Foto + Peta
  </h1>
  <p>Stempel visual di gambar, plus metadata EXIF yang sama di dalam file.</p>
@@ -175,22 +170,22 @@
 
 <!-- Bug #29: tab nav — 1 app, 3 tool -->
 <div class="tabs" role="tablist">
- <button type="button" class="tab active" id="tabBtnFoto" onclick="switchTab('foto')" role="tab" aria-selected="true">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+ <button type="button" class="tab" id="tabBtnFoto" onclick="switchTab('foto')" role="tab" aria-selected="false">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
   Stempel Geotag Foto
  </button>
  <button type="button" class="tab" id="tabBtnPdf" onclick="switchTab('pdf')" role="tab" aria-selected="false">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6M9 9h2"/></svg>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M9 13h6M9 17h6M9 9h2"></path></svg>
   Kompres PDF
  </button>
- <button type="button" class="tab" id="tabBtnSet" onclick="switchTab('set')" role="tab" aria-selected="false">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+ <button type="button" class="tab active" id="tabBtnSet" onclick="switchTab('set')" role="tab" aria-selected="true" style="display: inline-flex;">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
   Pengaturan
  </button>
 </div>
 
 <!-- Tab Foto -->
-<div id="tabFoto">
+<div id="tabFoto" style="display: none;">
 
 <section class="card" aria-labelledby="h-foto">
  <h2 id="h-foto">1 · Foto</h2>
@@ -202,35 +197,35 @@
 <section class="card" aria-labelledby="h-lokasi">
  <h2 id="h-lokasi">2 · Lokasi</h2>
  <label for="nama">Nama tempat / baris besar (format: Kota, Provinsi, Indonesia)</label>
- <input id="nama" value="Ambon, Maluku, Indonesia" autocomplete="off">
+ <input id="nama" value="Ambon, Maluku, Indonesia" autocomplete="off" __gcruniqueid="2">
  <p class="hint" style="margin-top:4px">Baris besar di stempel — pakai format "Kota, Provinsi, Indonesia". Otomatis terisi saat cari alamat/koordinat.</p>
  <label for="alamat">Alamat detail (jalan, lorong/RT, kelurahan, kecamatan, kota)</label>
- <input id="alamat" value="Jalan, RT/RW, Kelurahan, Kecamatan, Kota" autocomplete="off">
+ <input id="alamat" value="Jalan, RT/RW, Kelurahan, Kecamatan, Kota" autocomplete="off" __gcruniqueid="3">
  <p class="hint" style="margin-top:4px">Alamat lengkap untuk persamaan metadata. Otomatis dicari dari internet (OpenStreetMap) berdasarkan koordinat paling dekat.</p>
  <div class="actions">
   <button type="button" class="sec" id="btnCari" onclick="cariKoordinat()">
-   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
    Cari koordinat &amp; alamat
   </button>
   <button type="button" class="sec" id="btnReverse" onclick="cariAlamat()">
-   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12c0 5-4 9-9 9s-9-4-9-9 4-9 9-9c2 0 4 .7 5.5 2"/><path d="M21 3v5h-5"/></svg>
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12c0 5-4 9-9 9s-9-4-9-9 4-9 9-9c2 0 4 .7 5.5 2"></path><path d="M21 3v5h-5"></path></svg>
    Cari alamat dari koordinat
   </button>
   <button type="button" class="sec" onclick="lokasiSaya()">
-   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path><circle cx="12" cy="12" r="8"></circle></svg>
    Pakai GPS perangkat
   </button>
   <button type="button" class="sec" id="btnAcak" onclick="cariLokasiAcak()">
-   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"></rect><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"></circle><circle cx="15.5" cy="15.5" r="1.5" fill="currentColor"></circle><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor"></circle><circle cx="8.5" cy="15.5" r="1.5" fill="currentColor"></circle><circle cx="12" cy="12" r="1.5" fill="currentColor"></circle></svg>
    Lokasi acak terdekat
   </button>
  </div>
  <hr>
  <div class="row">
-  <div><label for="lat">Latitude</label><input id="lat" value="-3.6934" inputmode="decimal"></div>
-  <div><label for="lng">Longitude</label><input id="lng" value="128.1818" inputmode="decimal"></div>
+  <div><label for="lat">Latitude</label><input id="lat" value="-3.6934" inputmode="decimal" __gcruniqueid="4"></div>
+  <div><label for="lng">Longitude</label><input id="lng" value="128.1818" inputmode="decimal" __gcruniqueid="5"></div>
   <div><label for="zoom">Zoom peta</label>
-   <select id="zoom"><option>13</option><option>14</option><option selected>15</option><option>16</option><option>17</option></select>
+   <select id="zoom" __gcruniqueid="6"><option>13</option><option>14</option><option selected="">15</option><option>16</option><option>17</option></select>
   </div>
   <div><label>Radius acak</label>
    <div id="radiusAcak" style="padding:.46rem .6rem;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);border-radius:6px;color:#cfd9e6;font-size:.82rem">100 – 200 m</div>
@@ -245,15 +240,15 @@
   <div><label for="tgl">Tanggal</label><input id="tgl" type="date"></div>
   <div><label for="jam">Jam</label><input id="jam" type="time"></div>
   <div><label for="tz">Zona waktu</label>
-   <select id="tz">
+   <select id="tz" __gcruniqueid="7">
     <option value="WIB">WIB (+07:00)</option>
     <option value="WITA">WITA (+08:00)</option>
-    <option value="WIT" selected>WIT (+09:00)</option>
+    <option value="WIT" selected="">WIT (+09:00)</option>
    </select>
   </div>
  </div>
  <label for="note">Note kegiatan (tampil di bawah tanggal &amp; waktu pada foto)</label>
- <input id="note" value="Created by cam-stempel-GPS" autocomplete="off" maxlength="90">
+ <input id="note" value="Created by cam-stempel-GPS" autocomplete="off" maxlength="90" __gcruniqueid="8">
  <p class="hint" style="margin-top:4px">Catatan singkat kegiatan — akan tampil sebagai baris terakhir di stempel foto dan tersimpan di EXIF UserComment. Default: "Created by cam-stempel-GPS".</p>
 </section>
 
@@ -261,16 +256,16 @@
  <h2 id="h-kamera">4 · Metadata Kamera</h2>
  <p class="hint" style="margin-top:0">Metadata kamera dipakai supaya foto tidak terdeteksi sebagai hasil edit. Diisi otomatis dari EXIF asli bila ada.</p>
  <div class="row">
-  <div><label for="make">Merek HP</label><input id="make" value="samsung" autocomplete="off"></div>
-  <div><label for="model">Tipe HP</label><input id="model" value="SM-A325F" autocomplete="off"></div>
-  <div><label for="alt">Altitude (m)</label><input id="alt" type="number" step="0.1" value="0" inputmode="decimal"></div>
+  <div><label for="make">Merek HP</label><input id="make" value="samsung" autocomplete="off" __gcruniqueid="9"></div>
+  <div><label for="model">Tipe HP</label><input id="model" value="SM-A325F" autocomplete="off" __gcruniqueid="10"></div>
+  <div><label for="alt">Altitude (m)</label><input id="alt" type="number" step="0.1" value="0" inputmode="decimal" __gcruniqueid="11"></div>
  </div>
  <label class="chk">
-  <input type="checkbox" id="keepExif" checked>
+  <input type="checkbox" id="keepExif" checked="">
   <span>Pertahankan metadata kamera asli (ExposureTime, FNumber, ISO, FocalLength, dll.) bila foto JPG punya EXIF. GPS &amp; waktu akan ditimpa dengan isian Anda.</span>
  </label>
  <label class="chk">
-  <input type="checkbox" id="keepImgDesc" checked>
+  <input type="checkbox" id="keepImgDesc" checked="">
   <span>Sertakan ImageDescription (judul - alamat) di EXIF. Sebagian sistem memeriksa field ini untuk verifikasi tempat.</span>
  </label>
  <div class="warn" id="metaWarn" style="display:none"></div>
@@ -280,8 +275,8 @@
  <h2 id="h-hasil">5 · Hasil</h2>
  <div class="row" style="margin-top:4px">
   <div><label for="resizeMode">Ukuran foto (lebar px)</label>
-   <select id="resizeMode" onchange="toggleResizeCustom()">
-    <option value="asli" selected>Asli (tanpa resize)</option>
+   <select id="resizeMode" onchange="toggleResizeCustom()" __gcruniqueid="12">
+    <option value="asli" selected="">Asli (tanpa resize)</option>
     <option value="640">640 px</option>
     <option value="1024">1024 px</option>
     <option value="1280">1280 px</option>
@@ -292,15 +287,15 @@
   </div>
   <div id="resizeCustomWrap" style="display:none">
    <label for="resizeCustom">Lebar target (px)</label>
-   <input id="resizeCustom" type="number" min="320" max="4096" step="10" value="1280" inputmode="numeric">
+   <input id="resizeCustom" type="number" min="320" max="4096" step="10" value="1280" inputmode="numeric" __gcruniqueid="13">
   </div>
  </div>
  <p class="hint" style="margin-top:8px">Foto kecil bisa <b>diperbesar</b> (upscale) dan foto besar bisa <b>diperkecil</b> (downscale) — tinggi mengikuti otomatis (rasio asli dipertahankan). "Asli" = tanpa resize (maks 2000 px). Catatan: ini atur dimensi pixel. Untuk <b>naikkan ukuran file di disk</b> (mis. 130 KB → 750 KB), pakai mode "Naikkan ke ≈ target" di bawah. Upscale dimensi besar bisa terlihat agak lembut — gunakan seperlunya.</p>
  <div class="row" style="margin-top:4px">
   <div><label for="ukuranMode">Target ukuran file</label>
-   <select id="ukuranMode" onchange="toggleUkuranCustom()">
+   <select id="ukuranMode" onchange="toggleUkuranCustom()" __gcruniqueid="14">
     <option value="500">&lt; 500 KB (batas atas)</option>
-    <option value="1000" selected>&lt; 1 MB (batas atas)</option>
+    <option value="1000" selected="">&lt; 1 MB (batas atas)</option>
     <option value="custom">Atur sendiri (batas atas)</option>
     <option value="upscale">Naikkan ke ≈ target</option>
     <option value="0">Tanpa batas (kualitas penuh)</option>
@@ -308,11 +303,11 @@
   </div>
   <div id="ukuranCustomWrap" style="display:none">
    <label for="ukuranCustom">Maksimum (KB)</label>
-   <input id="ukuranCustom" type="number" min="50" max="20000" step="50" value="750" inputmode="numeric">
+   <input id="ukuranCustom" type="number" min="50" max="20000" step="50" value="750" inputmode="numeric" __gcruniqueid="15">
   </div>
   <div><label for="bolehDownscale">Kecilkan dimensi?</label>
-   <select id="bolehDownscale">
-    <option value="1" selected>Boleh (jika perlu)</option>
+   <select id="bolehDownscale" __gcruniqueid="16">
+    <option value="1" selected="">Boleh (jika perlu)</option>
     <option value="0">Pertahankan dimensi asli</option>
    </select>
   </div>
@@ -320,11 +315,11 @@
  <p class="hint" style="margin-top:8px">Urutan proses saat klik <b>"Buat geotag"</b>: (1) foto di-resize ke lebar target di atas (bisa perbesar/perkecil), (2) stempel geotag digambar, (3) ukuran file diproses sesuai mode: <b>batas atas</b> (kompresi kualitas+dimensi sampai di bawah target) / <b>Naikkan ke ≈ target</b> (kualitas &amp; dimensi dinaikkan utk mendekati target bila foto asli lebih kecil — mis. 130 KB → ≈ 750 KB) / <b>Tanpa batas</b> (kualitas penuh).</p>
  <div class="actions" style="margin-top:8px">
   <button type="button" id="btnBuat" onclick="buatGeotag()">
-   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
    Buat geotag
   </button>
-  <button type="button" class="dl" id="btnDl" style="display:none" onclick="unduh()" disabled>
-   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>
+  <button type="button" class="dl" id="btnDl" style="display:none" onclick="unduh()" disabled="">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"></path></svg>
    Download JPG + EXIF
   </button>
  </div>
@@ -343,7 +338,7 @@
   <h2>1 · Pilih PDF</h2>
   <!-- Bug #30: div onclick langsung (bukan label+button) — klik mana saja di kotak ini = buka file picker -->
   <div class="pdf-drop" id="pdfDrop" onclick="pdfPickerClick()" role="button" tabindex="0" aria-label="Pilih atau seret PDF" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pdfPickerClick();}">
-   <svg class="pdf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6M9 9h2"/></svg>
+   <svg class="pdf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M9 13h6M9 17h6M9 9h2"></path></svg>
    <p id="pdfDropHint">Pilih atau seret &amp; jatuhkan PDF di sini</p>
    <span class="pick">Pilih PDF</span>
    <div class="picked" id="pdfPicked" style="display:none"></div>
@@ -357,17 +352,17 @@
   <div class="pdf-row">
    <div class="pdf-field">
     <label for="pdfTarget">Ukuran target</label>
-    <input id="pdfTarget" type="number" min="10" max="50000" step="10" value="500" inputmode="numeric">
+    <input id="pdfTarget" type="number" min="10" max="50000" step="10" value="500" inputmode="numeric" __gcruniqueid="17">
    </div>
    <div class="pdf-field pdf-unit">
     <label for="pdfUnit">&nbsp;</label>
-    <select id="pdfUnit">
-     <option value="KB" selected>KB</option>
+    <select id="pdfUnit" __gcruniqueid="18">
+     <option value="KB" selected="">KB</option>
      <option value="MB">MB</option>
     </select>
    </div>
-   <button type="button" class="pdf-go" id="pdfGo" onclick="kompresPDF()" disabled>
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>
+   <button type="button" class="pdf-go" id="pdfGo" onclick="kompresPDF()" disabled="">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"></path></svg>
     Kompres PDF
    </button>
   </div>
@@ -379,41 +374,57 @@
  <div class="pdf-result" id="pdfResult"></div>
  <div class="pdf-download" id="pdfDownload">
   <button type="button" onclick="unduhPDF()">
-   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>
+   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"></path></svg>
    Download PDF
   </button>
  </div>
 </div><!-- /tabPdf -->
 
 <!-- Bug #32+33: Tab Pengaturan — admin bisa ganti password admin & user, kunci app -->
-<div id="tabSet" style="display:none" role="tabpanel" aria-labelledby="tabBtnSet">
- <section class="card">
+<div id="tabSet" style="display: block;" role="tabpanel" aria-labelledby="tabBtnSet">
+ <section class="card" id="createAdminSection" style="display: none;">
+  <h2 id="h-set-create">Buat Password Admin</h2>
+  <p class="hint" style="margin-top:0">⚠️ <b>Aplikasi belum dikunci.</b> Buat password admin SEKALI di sini. Setelah dibuat, aplikasi terkunci dan hanya bisa dibuka dgn password ini (admin) atau Kode Akses yang Anda buat di bawah. Min 8 karakter, disarankan campuran huruf besar/kecil/angka/simbol.</p>
+  <label for="createAdminPass">Password admin</label>
+  <input type="text" id="createAdminPass" autocomplete="new-password" __gcruniqueid="19">
+  <label for="createAdminConfirm">Konfirmasi password admin</label>
+  <input type="text" id="createAdminConfirm" autocomplete="new-password" onkeydown="if(event.key==='Enter')createAdminPassword()" __gcruniqueid="20">
+  <label class="chk"><input type="checkbox" id="createShow" onchange="toggleCreateShow()"><span>Tampilkan password</span></label>
+  <div class="actions" style="margin-top:8px">
+   <button type="button" onclick="createAdminPassword()">Buat Password Admin</button>
+  </div>
+  <p class="hint" id="createMsg" style="margin-top:8px;min-height:1.4em">✅ Password admin dibuat. Aplikasi sekarang terkunci — berikutnya masuk dgn password ini. Buat Kode Akses utk orang lain di bawah.</p>
+ </section>
+ <section class="card" id="changeAdminSection" style="display: block;">
   <h2 id="h-set-admin">Ganti Password Admin</h2>
-  <p class="hint" style="margin-top:0">Hanya admin (Anda) yang bisa ganti password admin. Wajib verifikasi password admin lama.</p>
+  <p class="hint" style="margin-top:0">Password admin hanya bisa diubah oleh admin dari dashboard ini. Wajib verifikasi password admin lama.</p>
   <label for="oldAdminPass">Password admin lama</label>
-  <input type="password" id="oldAdminPass" autocomplete="current-password">
+  <input type="password" id="oldAdminPass" autocomplete="current-password" __gcruniqueid="21">
   <label for="newAdminPass">Password admin baru</label>
-  <input type="password" id="newAdminPass" autocomplete="new-password">
+  <input type="password" id="newAdminPass" autocomplete="new-password" __gcruniqueid="22">
   <label for="newAdminConfirm">Konfirmasi password admin baru</label>
-  <input type="password" id="newAdminConfirm" autocomplete="new-password">
+  <input type="password" id="newAdminConfirm" autocomplete="new-password" __gcruniqueid="23">
   <label class="chk"><input type="checkbox" id="adminShow" onchange="toggleAdminShow()"><span>Tampilkan password</span></label>
   <div class="actions" style="margin-top:8px">
    <button type="button" onclick="changeAdminPassword()">Ganti Password Admin</button>
   </div>
   <p class="hint" id="adminMsg" style="margin-top:8px;min-height:1.4em"></p>
  </section>
- <section class="card">
-  <h2 id="h-set-user">Ganti Password User</h2>
-  <p class="hint" style="margin-top:0">Admin bisa ganti password user (untuk orang lain) kapan saja. Tidak perlu password user lama (admin override). Beri tahu user password barunya secara terpisah.</p>
-  <label for="newUserPass">Password user baru</label>
-  <input type="password" id="newUserPass" autocomplete="new-password">
-  <label for="newUserConfirm">Konfirmasi password user baru</label>
-  <input type="password" id="newUserConfirm" autocomplete="new-password">
-  <label class="chk"><input type="checkbox" id="userShow" onchange="toggleUserShow()"><span>Tampilkan password</span></label>
+<section class="card">
+  <h2 id="h-set-user">Kode Akses User</h2>
+  <p class="hint" style="margin-top:0">Buat <b>satu kode per orang</b>. Kode hanya tampil SEKALI saat dibuat — salin lalu kirim ke orangnya. User masuk dgn kode ini (tidak bisa ganti password &amp; tidak bisa buka Pengaturan). Anda bisa mencabut kode kapan saja.</p>
+  <label for="codeLabel">Nama penerima kode</label>
+  <input id="codeLabel" maxlength="40" placeholder="mis. Budi - Puskesmas A" autocomplete="off" onkeydown="if(event.key==='Enter')createAccessCode()" __gcruniqueid="24">
   <div class="actions" style="margin-top:8px">
-   <button type="button" onclick="changeUserPassword()">Ganti Password User</button>
+   <button type="button" onclick="createAccessCode()">Buat Kode Akses</button>
   </div>
-  <p class="hint" id="userMsg" style="margin-top:8px;min-height:1.4em"></p>
+  <div id="newCodeBox" class="code-box" style="display:none">
+   <div class="code-for">Kode utk <b id="newCodeFor">s1s2s3</b> — salin sekarang, tidak akan ditampilkan lagi:</div>
+   <div class="code-val" id="newCodeValue"></div>
+   <button type="button" class="sec" onclick="copyAccessCode()">Salin Kode</button>
+  </div>
+  <p class="hint" id="codeMsg" style="margin-top:8px;min-height:1.4em">✅ Kode disalin ke clipboard.</p>
+  <div id="codeList"><div class="code-row"><div class="code-info"><b>s1s2s3</b><span> · ID 2BVJ · dibuat 26/10/2026</span></div><button type="button" class="sec">Cabut</button></div></div>
  </section>
  <section class="card">
   <h2 id="h-set-lock">Kunci Aplikasi</h2>
@@ -421,6 +432,23 @@
   <div class="actions">
    <button type="button" class="sec" onclick="lockApp()">Kunci Sekarang</button>
   </div>
+ </section>
+ <section class="card" id="publishSection">
+  <h2 id="h-set-publish">Generate Versi Distribusi (untuk GitHub)</h2>
+  <p class="hint" style="margin-top:0">Tombol ini menghasilkan file <b>index.html</b> baru dgn password admin + semua <b>Kode Akses</b> TERTANAM (terenkripsi). Upload hasilnya ke GitHub. Orang lain hanya bisa masuk dgn <b>kode akses dari Anda</b> — tidak ada halaman buat-password utk mereka.</p>
+  <p class="hint"><b>Cara pakai:</b><br>
+  1. Buat kode akses utk tiap orang di section di atas (salin &amp; kirim ke orangnya)<br>
+  2. Klik tombol di bawah → download <b>index.html</b> (versi distribusi)<br>
+  3. Upload ke GitHub repo (replace index.html lama)<br>
+  4. Kirim link GitHub + kode akses masing-masing ke user<br>
+  5. User buka link → masukkan kodenya → pakai app
+  </p>
+  <p class="hint"><b>Tambah / cabut kode:</b> buka file ASLI (sebelum publish, simpan baik-baik) di komputer Anda, tambah atau cabut kode, lalu generate ulang &amp; upload ulang. Kode lama yang dicabut berhenti berlaku setelah file baru terpasang.</p>
+  <p class="hint">⚠️ File hasil memuat token terenkripsi (AES-GCM, PBKDF2 100k) + nama penerima kode (terlihat jika file dibaca) — pakai nama panggilan saja. Pakai password admin yang kuat (min 12 karakter). Ini aplikasi statis tanpa server, jadi pembatasan bersifat sisi-klien.</p>
+  <div class="actions">
+   <button type="button" onclick="generatePublishedVersion()">📦 Generate index.html (Published)</button>
+  </div>
+  <p class="hint" id="publishMsg" style="margin-top:8px;min-height:1.4em">⏳ Menyiapkan file distribusi...</p>
  </section>
 </div><!-- /tabSet -->
 
@@ -432,6 +460,7 @@ const MAX_IMG_SIZE = 2000;          // Bug #18: naikkan 1200 -> 2000 (lebih ting
 const JPEG_QUALITY = 0.95;          // Bug #18: naikkan 0.92 -> 0.95 (lebih sedikit kompresi)
 const TZ_OFFSET = {WIB:7, WITA:8, WIT:9};
 
+let sessionRole=null;    // 'admin' | 'user' | null (dideklarasikan paling awal agar aman dipakai switchTab)
 let img=null;
 let renderToken=0;
 let lastMeta=null;
@@ -1652,7 +1681,8 @@ const jadwal=()=>{
 
 /* ---------- Bug #29: Tab nav + kompresor PDF (gabung 1 app) ---------- */
 // Alias class pdf-lib dari global PDFLib
-const {PDFDocument, PDFName, PDFNumber, PDFRawStream}=PDFLib;
+// Dibuat aman: kalau CDN pdf-lib gagal dimuat (offline/diblokir), sisa aplikasi (login, tab, foto) tetap jalan
+const {PDFDocument, PDFName, PDFNumber, PDFRawStream}=(window.PDFLib||{});
 
 let pdfBlob=null;       // Blob PDF hasil kompresi
 let namaHasilPdf='PDF_kompres.pdf';
@@ -1804,6 +1834,7 @@ function pdfUkurTotal(decoded, q, skala){
 async function kompresPDF(){
   const file=$('pdf').files[0];
   if(!file){ $('pdfSt').textContent='Pilih PDF dulu.'; return; }
+  if(!window.PDFLib){ $('pdfSt').textContent='⚠️ Library PDF gagal dimuat (cek koneksi internet), lalu muat ulang halaman.'; return; }
   const go=$('pdfGo'); go.disabled=true;
   $('pdfDownload').style.display='none';
   $('pdfResult').style.display='none';
@@ -1940,24 +1971,25 @@ function unduhPDF(){
   $('pdfSt').textContent='✅ PDF diunduh: '+namaHasilPdf;
 }
 
-/* ---------- Bug #32+33+34: Two-tier password + HARDENED security ----------
-   Bug #32: 2-tier (admin + user)
-   Bug #33: role-based tab visibility
-   Bug #34: HARDENING — ganti SHA-256 dgn skema yg jauh lebih sulit ditembus:
-     1. PBKDF2 100.000 iterasi (bukan SHA-256 sekali jalan) — brute-force 1000× lebih lambat
-     2. AES-GCM encrypted validation token — TIDAK ADA hash utk di-brute-force langsung.
-        Verifikasi password = coba decrypt token. AES-GCM auth tag gagal = password salah.
-     3. Random salt per instalasi (disimpan di localStorage) — mencegah rainbow table.
-     4. Lockout exponential backoff — 5 gagal → kunci 30s/1m/5m/15m/1h. Reset setelah sukses.
-     5. Session timeout 30 menit — auto-kunci bila tidak ada aktivitas.
-     6. Min 8 karakter password — wajib utk admin & user.
-   CATATAN JUJUR: proteksi client-side. Orang dgn akses fisik ke file HTML + localStorage
-   MASIH BISA brute-force offline (lambat, ~10 attempt/detik dgn PBKDF2 100k). Untuk
-   proteksi tak tembus seutuhnya, perlu enkripsi konten app (encrypt app code dgn password-
-   derived key) ATAU server-side auth. Tapi ini sudah jauh lebih kuat dr SHA-256 polos. ---------- */
-const ADMIN_KEY='appAdminToken_v1';    // base64 IV+encrypted token utk admin
-const USER_KEY='appUserToken_v1';      // base64 IV+encrypted token utk user
-const SALT_KEY='appSalt_v1';           // base64 random salt (shared admin+user, per instalasi)
+/* ---------- Bug #36: Password admin SEKALI BUAT + Kode Akses dari admin ----------
+   - Password admin dibuat SEKALI oleh admin DI DASHBOARD (tab Pengaturan), hanya dari file
+     lokal (file:// atau localhost). Belum ada password => file lokal terbuka sbg admin.
+     Di situs yang sudah di-host tanpa password, aplikasi diblokir ("belum aktif"), jadi
+     orang lain tidak bisa membuat password sendiri. Tidak ada layar buat-password di login.
+   - Tidak ada lagi "password user" bersama. Admin membuat KODE AKSES per orang
+     (mis. ABCD-EFGH-JKLM-NPQR). Kode tampil SEKALI saat dibuat, lalu dikirim admin ke orangnya.
+   - Hanya admin (password) atau pemegang kode yang bisa masuk. Kode user tidak bisa ganti
+     password dan tidak bisa membuka tab Pengaturan.
+   - Kode bisa dicabut admin kapan saja. Di versi distribusi, pencabutan berlaku setelah
+     admin generate ulang index.html dan upload ulang.
+   - Keamanan: PBKDF2 100k + AES-GCM, salt acak, lockout bertingkat, timeout sesi 30 menit.
+   CATATAN JUJUR: ini aplikasi statis tanpa server. Pembatasan bersifat sisi-klien; file
+   distribusi memuat token terenkripsi, jadi kekuatan akses ada pada kekuatan password admin
+   dan kode (kode 16 karakter ≈ 59 bit entropi acak bagian rahasia). ---------- */
+const ADMIN_KEY='appAdminToken_v1';    // base64 IV+encrypted token utk admin (localStorage mode)
+const CODES_KEY='appAccessCodes_v1';   // JSON daftar kode akses (localStorage mode)
+const OLD_USER_KEY='appUserToken_v1';  // password user versi lama — dibersihkan
+const SALT_KEY='appSalt_v1';           // base64 random salt (localStorage mode)
 const FAIL_KEY='appFailCount_v1';     // jumlah upaya gagal
 const LOCK_KEY='appLockUntil_v1';     // timestamp kunci sampe
 const ACT_KEY='appLastActivity_v1';   // timestamp aktivitas terakhir
@@ -1965,8 +1997,25 @@ const PBKDF2_ITER=100000;               // iterasi (100k = ~100ms per attempt di
 const LOCKOUT_TIMES=[30000,60000,300000,900000,3600000];   // 30s, 1m, 5m, 15m, 1h
 const SESSION_TIMEOUT=30*60*1000;      // 30 menit
 const MIN_PASSWORD_LEN=8;
+const CODE_ALPHABET='ABCDEFGHJKMNPQRSTUVWXYZ23456789';   // 31 karakter, tanpa I/L/O/0/1 (mudah salah baca)
+const CODE_LEN=16;                      // 4 karakter ID + 12 karakter rahasia
+const CODE_ID_LEN=4;
 
-let sessionRole=null;    // 'admin' | 'user' | null
+// Embedded data — diisi oleh generatePublishedVersion() saat admin generate file distribusi.
+// Di mode dev (file asli), ini kosong — app pakai localStorage. Di mode published (file distribusi),
+// ini terisi. PUBLISHED_MODE auto-detek dari sini.
+const EMBEDDED_SALT='9Kk7kQa+48/LJibtkeVxNw==';
+const EMBEDDED_ADMIN_TOKEN='pwVPDvIw2khmTLeE3i/JH/K0n8dNVj0llMRAsKayUF8wVCDJaZrq2yYQzmL2BBeiupA8y3RQMSOCzRCW';
+const EMBEDDED_CODES='W3siaWQiOiIyQlZKIiwibGFiZWwiOiJzMXMyczMiLCJ0b2tlbiI6IlZFL29SaGlCcTJoWnRteW1IZklrV1R0RXBqeTY4N3l1RzdJQzFpZFMwZXRqSEc5dHIvTjdqeXlYblpOUEhqcnZGQlJHdnJDRUM4U2dZVVJTIiwiY3JlYXRlZCI6MTc5Mjk3ODg5NTgzMn1d';
+const PUBLISHED_MODE=!!(EMBEDDED_SALT && EMBEDDED_ADMIN_TOKEN);
+
+let loginBusy=false;
+
+// Setup password admin hanya boleh dari file lokal / localhost — bukan dari situs yang di-host
+function isLocalContext(){
+  const h=location.hostname;
+  return location.protocol==='file:' || h==='localhost' || h==='127.0.0.1' || h==='[::1]' || h==='::1';
+}
 
 // --- util base64 <-> Uint8Array ---
 function toB64(bytes){ return btoa(String.fromCharCode.apply(null, bytes)); }
@@ -1976,8 +2025,23 @@ function fromB64(str){
   return bytes;
 }
 
-// --- Random salt (16 byte) + token (32 byte) + IV (12 byte AES-GCM) ---
+// --- Random bytes (salt 16 byte, token 32 byte, IV 12 byte AES-GCM) ---
 function randomBytes(n){ const a=new Uint8Array(n); crypto.getRandomValues(a); return a; }
+
+// --- Karakter acak dari CODE_ALPHABET (rejection sampling, tanpa modulo bias) ---
+function randomChars(n){
+  const lim=256-(256%CODE_ALPHABET.length);
+  let out='';
+  while(out.length<n){
+    const buf=randomBytes(n*2);
+    for(let i=0;i<buf.length&&out.length<n;i++){
+      if(buf[i]<lim) out+=CODE_ALPHABET[buf[i]%CODE_ALPHABET.length];
+    }
+  }
+  return out;
+}
+function formatCode(full){ return full.match(/.{1,4}/g).join('-'); }
+function normCode(s){ return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
 
 // --- PBKDF2 key derivation: password + salt → AES-GCM 256-bit key ---
 async function deriveKEK(password, saltBytes){
@@ -2008,8 +2072,9 @@ async function decryptToken(kek, combined){
   return crypto.subtle.decrypt({name:'AES-GCM', iv}, kek, ct);
 }
 
-// --- Salt getter (create once per install) ---
+// --- Salt getter (prefer embedded, fall back to localStorage) ---
 function getSalt(){
+  if(EMBEDDED_SALT) return fromB64(EMBEDDED_SALT);
   let s=localStorage.getItem(SALT_KEY);
   if(s) return fromB64(s);
   const salt=randomBytes(16);
@@ -2017,38 +2082,50 @@ function getSalt(){
   return salt;
 }
 
-// --- Set password: generate random token, encrypt dgn KEK ---
+// --- Daftar kode akses (embedded di mode published, localStorage di mode dev) ---
+function getCodes(){
+  try{
+    if(PUBLISHED_MODE){
+      if(!EMBEDDED_CODES) return [];
+      const arr=JSON.parse(new TextDecoder().decode(fromB64(EMBEDDED_CODES)));
+      return Array.isArray(arr)?arr:[];
+    }
+    const arr=JSON.parse(localStorage.getItem(CODES_KEY)||'[]');
+    return Array.isArray(arr)?arr:[];
+  }catch(e){ return []; }
+}
+function saveCodes(list){ localStorage.setItem(CODES_KEY, JSON.stringify(list)); }
+
+// --- Set password admin: generate random token, encrypt dgn KEK (mode dev only) ---
 async function setAdminPassword(p){
   const kek=await deriveKEK(p, getSalt());
   const token=randomBytes(32);
   const enc=await encryptToken(kek, token);
   localStorage.setItem(ADMIN_KEY, toB64(enc));
 }
-async function setUserPassword(p){
-  const kek=await deriveKEK(p, getSalt());
-  const token=randomBytes(32);
-  const enc=await encryptToken(kek, token);
-  localStorage.setItem(USER_KEY, toB64(enc));
-}
 
-// --- Verify password: coba decrypt token. AES-GCM auth gagal = password salah ---
+// --- Verify admin: prefer embedded token (published mode), fall back to localStorage ---
 async function verifyAdmin(p){
-  const stored=localStorage.getItem(ADMIN_KEY);
+  const stored=EMBEDDED_ADMIN_TOKEN || localStorage.getItem(ADMIN_KEY);
   if(!stored) return false;
   const kek=await deriveKEK(p, getSalt());
   try{ await decryptToken(kek, fromB64(stored)); return true; }
   catch(e){ return false; }
 }
-async function verifyUser(p){
-  const stored=localStorage.getItem(USER_KEY);
-  if(!stored) return false;
-  const kek=await deriveKEK(p, getSalt());
-  try{ await decryptToken(kek, fromB64(stored)); return true; }
+// --- Verify kode akses: 4 karakter pertama = ID entri, jadi cukup 1x PBKDF2 ---
+async function verifyCode(input){
+  const norm=normCode(input);
+  if(norm.length!==CODE_LEN) return false;
+  const entry=getCodes().find(e=>e&&e.id===norm.slice(0,CODE_ID_LEN));
+  if(!entry||!entry.token) return false;
+  const kek=await deriveKEK(norm, getSalt());
+  try{ await decryptToken(kek, fromB64(entry.token)); return true; }
   catch(e){ return false; }
 }
 
 function isPasswordSet(){
-  return !!(localStorage.getItem(ADMIN_KEY) && localStorage.getItem(USER_KEY));
+  if(PUBLISHED_MODE) return true;
+  return !!localStorage.getItem(ADMIN_KEY);
 }
 
 // --- Lockout: track failed attempts, exponential backoff ---
@@ -2082,54 +2159,72 @@ function checkSessionTimeout(){
   }
 }
 
-// --- Login overlay show ---
+// --- Login overlay. Mode: 'login' | 'blocked' ---
 function showLogin(mode){
   const ov=$('loginOverlay'); if(!ov) return;
   ov.style.display='flex';
-  $('loginMode').style.display = (mode==='login') ? 'block' : 'none';
-  $('setupMode').style.display = (mode==='setup') ? 'block' : 'none';
+  let effMode=mode;
+  if(PUBLISHED_MODE) effMode='login';
+  $('loginMode').style.display = (effMode==='login') ? 'block' : 'none';
+  $('blockedMode').style.display = (effMode==='blocked') ? 'block' : 'none';
   const lp=$('loginPass'); if(lp) lp.value='';
   const le=$('loginErr'); if(le) le.textContent='';
-  ['setupAdminPass','setupAdminConfirm','setupUserPass','setupUserConfirm'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
-  const se=$('setupErr'); if(se) se.textContent='';
-  ['loginShow','setupShow'].forEach(id=>{ const el=$(id); if(el) el.checked=false; });
-  ['loginPass','setupAdminPass','setupAdminConfirm','setupUserPass','setupUserConfirm'].forEach(id=>{ const el=$(id); if(el) el.type='password'; });
-  setTimeout(()=>{ try{ (mode==='login'?$('loginPass'):$('setupAdminPass')).focus(); }catch(e){} }, 50);
+  const ls=$('loginShow'); if(ls) ls.checked=false;
+  if(lp) lp.type='password';
+  setTimeout(()=>{ try{ if(effMode==='login') $('loginPass').focus(); }catch(e){} }, 50);
 }
 function hideLogin(){ $('loginOverlay').style.display='none'; }
 
 function showTabNav(){
   const btnSet=$('tabBtnSet');
-  if(btnSet) btnSet.style.display = (sessionRole==='admin') ? 'inline-flex' : 'none';
-  if(sessionRole==='user') switchTab('foto');
+  if(btnSet){
+    // Versi distribusi: tab Pengaturan disembunyikan utk semua. Mode dev: hanya admin.
+    if(PUBLISHED_MODE){
+      btnSet.style.display='none';
+    }else{
+      btnSet.style.display = (sessionRole==='admin') ? 'inline-flex' : 'none';
+    }
+  }
+  if(sessionRole==='user' || (PUBLISHED_MODE && sessionRole!==null)) switchTab('foto');
+  if(sessionRole==='admin' && !PUBLISHED_MODE){ renderCodeList(); refreshSettingsState(); }
 }
 
-// --- SETUP: first time buat password admin + user ---
-async function submitSetup(){
-  const ap=$('setupAdminPass').value, ac=$('setupAdminConfirm').value;
-  const up=$('setupUserPass').value, uc=$('setupUserConfirm').value;
-  const err=$('setupErr');
-  if(!ap||!ac||!up||!uc){ err.textContent='Semua kolom wajib diisi.'; return; }
-  if(ap!==ac){ err.textContent='Konfirmasi password admin tidak cocok.'; return; }
-  if(up!==uc){ err.textContent='Konfirmasi password user tidak cocok.'; return; }
-  if(ap.length<MIN_PASSWORD_LEN){ err.textContent='Password admin minimal '+MIN_PASSWORD_LEN+' karakter.'; return; }
-  if(up.length<MIN_PASSWORD_LEN){ err.textContent='Password user minimal '+MIN_PASSWORD_LEN+' karakter.'; return; }
-  if(ap===up){ err.textContent='Password admin & user tidak boleh sama.'; return; }
-  err.textContent='⏳ Mengenkripsi (PBKDF2 100k iter)...';
-  await setAdminPassword(ap);
-  await setUserPassword(up);
+// --- Tampilkan kartu "Buat" (belum ada password) atau "Ganti" (sudah ada) di Pengaturan ---
+function refreshSettingsState(){
+  const has=isPasswordSet();
+  const c=$('createAdminSection'), g=$('changeAdminSection');
+  if(c) c.style.display = has ? 'none' : 'block';
+  if(g) g.style.display = has ? 'block' : 'none';
+}
+
+// --- BUAT password admin: SEKALI, oleh admin, dari dashboard (hanya file lokal) ---
+async function createAdminPassword(){
+  const msg=$('createMsg');
+  if(sessionRole!=='admin'){ msg.textContent='⚠️ Hanya admin yang bisa membuat password.'; return; }
+  if(PUBLISHED_MODE || isPasswordSet()){ msg.textContent='⚠️ Password admin sudah dibuat. Gunakan "Ganti Password Admin".'; refreshSettingsState(); return; }
+  if(!isLocalContext()){ msg.textContent='⚠️ Password hanya bisa dibuat dari file lokal.'; return; }
+  const neu=$('createAdminPass').value, conf=$('createAdminConfirm').value;
+  if(!neu||!conf){ msg.textContent='⚠️ Semua kolom wajib diisi.'; return; }
+  if(neu!==conf){ msg.textContent='⚠️ Konfirmasi tidak cocok.'; return; }
+  if(neu.length<MIN_PASSWORD_LEN){ msg.textContent='⚠️ Password minimal '+MIN_PASSWORD_LEN+' karakter.'; return; }
+  msg.textContent='⏳ Mengenkripsi (PBKDF2 100k iter)...';
+  await setAdminPassword(neu);
+  localStorage.removeItem(OLD_USER_KEY);
   resetFails();
-  sessionRole='admin';
-  hideLogin();
-  showTabNav();
-  switchTab('foto');
+  $('createAdminPass').value=''; $('createAdminConfirm').value='';
+  msg.textContent='✅ Password admin dibuat. Aplikasi sekarang terkunci — berikutnya masuk dgn password ini. Buat Kode Akses utk orang lain di bawah.';
   recordActivity();
+  refreshSettingsState();
+}
+function toggleCreateShow(){
+  const s=$('createShow').checked;
+  ['createAdminPass','createAdminConfirm'].forEach(id=>{ const el=$(id); if(el) el.type=s?'text':'password'; });
 }
 
-// --- LOGIN: cek lockout dulu, lalu verify ---
+// --- LOGIN: cek lockout dulu, lalu verify admin (password) atau user (kode akses) ---
 async function submitLogin(){
+  if(loginBusy) return;
   const err=$('loginErr');
-  // Cek lockout
   const lock=getLockStatus();
   if(lock.locked){
     const s=Math.ceil(lock.remaining/1000);
@@ -2137,44 +2232,43 @@ async function submitLogin(){
     return;
   }
   const pass=$('loginPass').value;
-  if(!pass){ err.textContent='Password tidak boleh kosong.'; return; }
-  err.textContent='⏳ Memverifikasi (PBKDF2 100k iter)...';
-  if(await verifyAdmin(pass)){
-    sessionRole='admin'; resetFails(); hideLogin(); showTabNav(); switchTab('foto'); recordActivity();
-  }else if(await verifyUser(pass)){
-    sessionRole='user'; resetFails(); hideLogin(); showTabNav(); switchTab('foto'); recordActivity();
-  }else{
-    const fails=recordFailedAttempt();
-    let msg='Password salah. ('+fails+'× gagal)';
-    if(fails>=5){
-      const idx=Math.min(LOCKOUT_TIMES.length-1, fails-5);
-      const lockMs=LOCKOUT_TIMES[idx];
-      const s=Math.ceil(lockMs/1000);
-      msg='🔒 Terkunci '+s+' detik ('+fails+'× gagal). Password salah.';
+  if(!pass){ err.textContent='Password / kode akses tidak boleh kosong.'; return; }
+  loginBusy=true;
+  try{
+    err.textContent='⏳ Memverifikasi (PBKDF2 100k iter)...';
+    if(await verifyAdmin(pass)){
+      sessionRole='admin'; resetFails(); hideLogin(); showTabNav(); switchTab('foto'); recordActivity();
+    }else if(await verifyCode(pass)){
+      sessionRole='user'; resetFails(); hideLogin(); showTabNav(); switchTab('foto'); recordActivity();
+    }else{
+      const fails=recordFailedAttempt();
+      let msg='Password / kode akses salah. ('+fails+'× gagal)';
+      if(fails>=5){
+        const idx=Math.min(LOCKOUT_TIMES.length-1, fails-5);
+        const s=Math.ceil(LOCKOUT_TIMES[idx]/1000);
+        msg='🔒 Terkunci '+s+' detik ('+fails+'× gagal). Password / kode akses salah.';
+      }
+      err.textContent=msg;
+      $('loginPass').value=''; $('loginPass').focus();
     }
-    err.textContent=msg;
-    $('loginPass').value=''; $('loginPass').focus();
-  }
+  }finally{ loginBusy=false; }
 }
 
 function toggleLoginShow(){ const s=$('loginShow').checked; $('loginPass').type=s?'text':'password'; }
-function toggleSetupShow(){
-  const s=$('setupShow').checked;
-  ['setupAdminPass','setupAdminConfirm','setupUserPass','setupUserConfirm'].forEach(id=>{ const el=$(id); if(el) el.type=s?'text':'password'; });
-}
 function toggleAdminShow(){
   const s=$('adminShow').checked;
   ['oldAdminPass','newAdminPass','newAdminConfirm'].forEach(id=>{ const el=$(id); if(el) el.type=s?'text':'password'; });
 }
-function toggleUserShow(){
-  const s=$('userShow').checked;
-  ['newUserPass','newUserConfirm'].forEach(id=>{ const el=$(id); if(el) el.type=s?'text':'password'; });
-}
 
-// --- Ganti password admin (perlu password lama utk verifikasi) ---
+// --- Ganti password admin (mode dev only — PUBLISHED_MODE disable) ---
 async function changeAdminPassword(){
-  const old=$('oldAdminPass').value, neu=$('newAdminPass').value, conf=$('newAdminConfirm').value;
   const msg=$('adminMsg');
+  if(sessionRole!=='admin'){ msg.textContent='⚠️ Hanya admin yang bisa ganti password.'; return; }
+  if(PUBLISHED_MODE){
+    msg.textContent='⚠️ Mode distribusi: password tidak bisa diganti lokal. Generate ulang file (dari file asli) utk ganti password.';
+    return;
+  }
+  const old=$('oldAdminPass').value, neu=$('newAdminPass').value, conf=$('newAdminConfirm').value;
   if(!old||!neu||!conf){ msg.textContent='⚠️ Semua kolom wajib diisi.'; return; }
   if(neu!==conf){ msg.textContent='⚠️ Konfirmasi tidak cocok.'; return; }
   if(neu.length<MIN_PASSWORD_LEN){ msg.textContent='⚠️ Password baru minimal '+MIN_PASSWORD_LEN+' karakter.'; return; }
@@ -2182,27 +2276,93 @@ async function changeAdminPassword(){
   if(!(await verifyAdmin(old))){ msg.textContent='⚠️ Password admin lama salah.'; return; }
   msg.textContent='⏳ Mengenkripsi password baru...';
   await setAdminPassword(neu);
-  msg.textContent='✅ Password admin diganti. Login berikutnya pakai password admin baru.';
+  msg.textContent='✅ Password admin diganti. Kode akses user yang sudah dibuat tetap berlaku.';
   $('oldAdminPass').value=''; $('newAdminPass').value=''; $('newAdminConfirm').value='';
 }
 
-// --- Ganti password user (admin override, tanpa password user lama) ---
-async function changeUserPassword(){
-  const neu=$('newUserPass').value, conf=$('newUserConfirm').value;
-  const msg=$('userMsg');
-  if(!neu||!conf){ msg.textContent='⚠️ Semua kolom wajib diisi.'; return; }
-  if(neu!==conf){ msg.textContent='⚠️ Konfirmasi tidak cocok.'; return; }
-  if(neu.length<MIN_PASSWORD_LEN){ msg.textContent='⚠️ Password user baru minimal '+MIN_PASSWORD_LEN+' karakter.'; return; }
-  msg.textContent='⏳ Mengenkripsi password user baru...';
-  await setUserPassword(neu);
-  msg.textContent='✅ Password user diganti. Beri tahu user password barunya secara terpisah.';
-  $('newUserPass').value=''; $('newUserConfirm').value='';
+/* ---------- Kode Akses: dibuat & dicabut admin ---------- */
+function renderCodeList(){
+  const box=$('codeList'); if(!box) return;
+  box.textContent='';
+  const list=getCodes();
+  if(!list.length){
+    const p=document.createElement('p'); p.className='hint'; p.textContent='Belum ada kode akses. Buat kode di atas untuk memberi akses ke orang lain.';
+    box.appendChild(p); return;
+  }
+  list.forEach(e=>{
+    const row=document.createElement('div'); row.className='code-row';
+    const info=document.createElement('div'); info.className='code-info';
+    const nm=document.createElement('b'); nm.textContent=e.label||'(tanpa nama)';
+    const dt=document.createElement('span');
+    const d=e.created?new Date(e.created):null;
+    dt.textContent=' · ID '+e.id+(d?' · dibuat '+d.toLocaleDateString('id-ID'):'');
+    info.appendChild(nm); info.appendChild(dt);
+    const b=document.createElement('button'); b.type='button'; b.className='sec'; b.textContent='Cabut';
+    b.onclick=()=>revokeAccessCode(e.id);
+    row.appendChild(info); row.appendChild(b);
+    box.appendChild(row);
+  });
+}
+
+async function createAccessCode(){
+  const msg=$('codeMsg');
+  if(sessionRole!=='admin'){ msg.textContent='⚠️ Hanya admin yang bisa membuat kode.'; return; }
+  if(PUBLISHED_MODE){ msg.textContent='⚠️ Mode distribusi: buat kode dari file asli, lalu generate ulang index.html.'; return; }
+  if(!isPasswordSet()){ msg.textContent='⚠️ Buat password admin dulu (kartu di atas) sebelum membuat kode akses.'; return; }
+  const label=$('codeLabel').value.trim().slice(0,40);
+  if(!label){ msg.textContent='⚠️ Isi nama penerima kode dulu.'; return; }
+  msg.textContent='⏳ Membuat kode (PBKDF2 100k iter)...';
+  const list=getCodes();
+  let id; do{ id=randomChars(CODE_ID_LEN); }while(list.some(e=>e.id===id));
+  const full=id+randomChars(CODE_LEN-CODE_ID_LEN);
+  const kek=await deriveKEK(full, getSalt());
+  const enc=await encryptToken(kek, randomBytes(32));
+  list.push({id, label, token:toB64(enc), created:Date.now()});
+  saveCodes(list);
+  $('newCodeFor').textContent=label;
+  $('newCodeValue').textContent=formatCode(full);
+  $('newCodeBox').style.display='block';
+  $('codeLabel').value='';
+  msg.textContent='✅ Kode dibuat. Salin dan kirim ke '+label+'. Kode ini tidak akan ditampilkan lagi.';
+  renderCodeList();
+}
+
+async function copyAccessCode(){
+  const txt=$('newCodeValue').textContent, msg=$('codeMsg');
+  try{ await navigator.clipboard.writeText(txt); msg.textContent='✅ Kode disalin ke clipboard.'; }
+  catch(e){
+    try{
+      const r=document.createRange(); r.selectNodeContents($('newCodeValue'));
+      const s=getSelection(); s.removeAllRanges(); s.addRange(r);
+      msg.textContent='Kode terpilih — tekan Ctrl+C / Salin manual.';
+    }catch(e2){ msg.textContent='⚠️ Gagal menyalin otomatis. Salin manual dari kotak kode.'; }
+  }
+}
+
+function hideNewCode(){
+  const b=$('newCodeBox'); if(b) b.style.display='none';
+  const v=$('newCodeValue'); if(v) v.textContent='';
+}
+
+function revokeAccessCode(id){
+  if(sessionRole!=='admin'||PUBLISHED_MODE) return;
+  const list=getCodes(); const e=list.find(x=>x.id===id); if(!e) return;
+  if(!confirm('Cabut kode akses untuk "'+(e.label||id)+'"? Orang ini tidak bisa masuk lagi.')) return;
+  saveCodes(list.filter(x=>x.id!==id));
+  hideNewCode();
+  renderCodeList();
+  $('codeMsg').textContent='✅ Kode dicabut. Jika file sudah dipublikasikan, generate ulang index.html & upload ulang agar pencabutan berlaku di sana.';
 }
 
 // --- Kunci app ---
 function lockApp(){
+  if(!PUBLISHED_MODE && !isPasswordSet()){
+    alert('Aplikasi belum punya password. Buat password admin dulu di tab Pengaturan.');
+    return;
+  }
   sessionRole=null;
   localStorage.removeItem(ACT_KEY);
+  hideNewCode();
   showLogin('login');
   showTabNav();
 }
@@ -2212,20 +2372,87 @@ function setupActivityTracking(){
   ['mousemove','keydown','click','touchstart'].forEach(ev=>{
     document.addEventListener(ev, ()=>{ if(sessionRole!==null) recordActivity(); }, {passive:true});
   });
-  // Check tiap 60 detik
   setInterval(()=>{ if(sessionRole!==null) checkSessionTimeout(); }, 60000);
 }
 
 // --- Init ---
+// Sudah ada password (atau versi distribusi) -> wajib login.
+// Belum ada password + file lokal -> terbuka sbg admin; admin membuat password di tab Pengaturan.
+// Belum ada password + situs ter-host -> diblokir (orang lain tidak bisa membuat password).
 (async function initPassword(){
-  if(isPasswordSet()){
+  if(!PUBLISHED_MODE) localStorage.removeItem(OLD_USER_KEY);
+  if(PUBLISHED_MODE || isPasswordSet()){
     showLogin('login');
+  }else if(isLocalContext()){
+    sessionRole='admin';
+    hideLogin();
+    showTabNav();
+    switchTab('set');
+    const m=$('createMsg'); if(m) m.textContent='Selamat datang, admin. Buat password admin di sini untuk mengunci aplikasi.';
   }else{
-    showLogin('setup');
+    showLogin('blocked');
   }
   showTabNav();
   setupActivityTracking();
 })();
+
+/* ---------- Generate Versi Distribusi ----------
+   Menanam salt + token admin + daftar kode akses (terenkripsi) ke index.html baru.
+   Upload hasilnya ke GitHub. Pengunjung hanya bisa masuk dengan password admin atau kode akses. ---------- */
+async function generatePublishedVersion(){
+  const msg=$('publishMsg');
+  if(sessionRole!=='admin'){
+    if(msg) msg.textContent='⚠️ Hanya admin yg bisa generate versi distribusi.';
+    return;
+  }
+  if(PUBLISHED_MODE){
+    if(msg) msg.textContent='⚠️ File ini sudah versi distribusi. Pakai file asli (sebelum publish) utk generate ulang.';
+    return;
+  }
+  const salt=localStorage.getItem(SALT_KEY);
+  const adminToken=localStorage.getItem(ADMIN_KEY);
+  if(!salt||!adminToken){
+    if(msg) msg.textContent='⚠️ Buat password admin dulu di kartu "Buat Password Admin" sebelum generate.';
+    return;
+  }
+  const codes=getCodes();
+  if(!codes.length){
+    if(!confirm('Belum ada kode akses. Versi distribusi hanya bisa dibuka dengan password admin. Lanjut generate?')) return;
+  }
+  if(msg) msg.textContent='⏳ Menyiapkan file distribusi...';
+  const codesB64=codes.length?toB64(new TextEncoder().encode(JSON.stringify(codes))):'';
+  // Salin DOM lalu bersihkan state sementara supaya file hasil bersih
+  const clone=document.documentElement.cloneNode(true);
+  const cvc=clone.querySelector('#cv');
+  if(cvc){ cvc.removeAttribute('width'); cvc.removeAttribute('height'); cvc.removeAttribute('style'); }
+  const bgc=clone.querySelector('#bg');
+  if(bgc){ bgc.removeAttribute('width'); bgc.removeAttribute('height'); }
+  const ov=clone.querySelector('#loginOverlay');
+  if(ov) ov.setAttribute('style','display:none');
+  const nc=clone.querySelector('#newCodeBox');
+  if(nc) nc.setAttribute('style','display:none');
+  const ncv=clone.querySelector('#newCodeValue');
+  if(ncv) ncv.textContent='';
+  let html='<!DOCTYPE html>\n'+clone.outerHTML;
+  const rep=(name,val)=>{
+    const re=new RegExp("^const "+name+"='[^']*';","m");
+    if(!re.test(html)) return false;
+    html=html.replace(re,()=>"const "+name+"='"+val+"';");
+    return true;
+  };
+  const ok=rep('EMBEDDED_SALT',salt) && rep('EMBEDDED_ADMIN_TOKEN',adminToken) && rep('EMBEDDED_CODES',codesB64);
+  if(!ok){
+    if(msg) msg.textContent='⚠️ Gagal inject data. Konstanta EMBEDDED tidak ditemukan di HTML.';
+    return;
+  }
+  const blob=new Blob([html], {type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='index.html';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  if(msg) msg.textContent='✅ index.html (versi distribusi) diunduh dengan '+codes.length+' kode akses. Upload ke GitHub utk replace index.html lama.';
+}
 </script>
 <script>
 /* ===== Latar bintang "warp" ===== */
@@ -2303,5 +2530,6 @@ let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(resize,200)
 resize();start();
 })();
 </script>
-</body>
-</html>
+
+
+</body></html>

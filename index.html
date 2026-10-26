@@ -106,11 +106,65 @@
  .pdf-download button:hover{background:var(--success-h)}
  .pdf-bar{margin-top:10px;height:5px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;display:none}
  .pdf-bar>div{height:100%;background:var(--primary);transition:width .25s ease;width:0}
+ /* Bug #32: Login overlay — password gate */
+ .login-overlay{position:fixed;inset:0;background:rgba(2,3,10,.96);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px;backdrop-filter:blur(4px)}
+ .login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px 24px;max-width:360px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+ .login-card h2{margin:0 0 4px;font-size:1.25rem;font-weight:800;text-transform:none;letter-spacing:normal;color:var(--text)}
+ .login-card p{margin:0 0 18px;color:var(--muted);font-size:.875rem;line-height:1.5}
+ .login-card label{font-size:.8125rem;color:var(--muted);margin:10px 0 4px;font-weight:600}
+ .login-card input[type=password],.login-card input[type=text]{width:100%;min-height:44px;padding:10px 12px;margin-bottom:8px;font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:8px}
+ .login-card button{width:100%;margin-top:8px}
+ .login-err{color:#fbbf24;font-size:.8125rem;margin:8px 0;min-height:1.2em;text-align:center}
+ .login-card .chk{margin-top:12px;font-size:.8125rem;font-weight:400}
+ /* Bug #33: floating lock button — visible to both admin & user */
+ .lock-btn{position:fixed;top:12px;right:12px;background:var(--surface);color:var(--muted);border:1px solid var(--border);padding:7px 12px;min-height:36px;border-radius:8px;font-size:.8rem;font-weight:600;z-index:100;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+ .lock-btn:hover{background:var(--primary);color:var(--primary-fg);border-color:var(--primary)}
+ .lock-btn svg{width:14px;height:14px;flex:none}
  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
 <canvas id="bg" aria-hidden="true"></canvas>
+
+<!-- Bug #32+33: Login overlay — password gate dgn 2 mode: setup (admin+user) & login tunggal -->
+<div id="loginOverlay" class="login-overlay" style="display:none">
+ <div class="login-card">
+  <!-- LOGIN MODE: masukkan password (admin atau user) -->
+  <div id="loginMode">
+   <h2>Masuk Aplikasi</h2>
+   <p>Masukkan password (admin atau user) untuk membuka aplikasi. Sistem auto-detect role.</p>
+   <label for="loginPass">Password</label>
+   <input type="password" id="loginPass" placeholder="Password admin atau user" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitLogin()">
+   <button type="button" onclick="submitLogin()">Masuk</button>
+   <p id="loginErr" class="login-err"></p>
+   <label class="chk"><input type="checkbox" id="loginShow" onchange="toggleLoginShow()"><span>Tampilkan password</span></label>
+  </div>
+  <!-- SETUP MODE: first time — buat password admin + user -->
+  <div id="setupMode" style="display:none">
+   <h2>Buat Password</h2>
+   <p>Buat <b>password admin</b> (Anda — bisa ganti password kapan saja) + <b>password user</b> (untuk orang lain yang boleh pakai app tapi tidak bisa ganti password). Min 8 karakter. Disarankan campuran huruf besar/kecil/angka/simbol.</p>
+   <label for="setupAdminPass">Password Admin (Anda)</label>
+   <input type="password" id="setupAdminPass" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitSetup()">
+   <label for="setupAdminConfirm">Konfirmasi Password Admin</label>
+   <input type="password" id="setupAdminConfirm" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitSetup()">
+   <hr style="margin:14px 0;border-color:var(--border)">
+   <label for="setupUserPass">Password User (untuk orang lain)</label>
+   <input type="password" id="setupUserPass" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitSetup()">
+   <label for="setupUserConfirm">Konfirmasi Password User</label>
+   <input type="password" id="setupUserConfirm" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitSetup()">
+   <button type="button" onclick="submitSetup()">Buat Password</button>
+   <p id="setupErr" class="login-err"></p>
+   <label class="chk"><input type="checkbox" id="setupShow" onchange="toggleSetupShow()"><span>Tampilkan password</span></label>
+  </div>
+ </div>
+</div>
+
+<!-- Bug #33: floating lock button — siapa saja (admin/user) bisa kunci app kapan saja -->
+<button type="button" class="lock-btn" onclick="lockApp()" title="Kunci aplikasi" aria-label="Kunci aplikasi">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+ Kunci
+</button>
+
 <header class="top">
  <h1>
   <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -119,7 +173,7 @@
  <p>Stempel visual di gambar, plus metadata EXIF yang sama di dalam file.</p>
 </header>
 
-<!-- Bug #29: tab nav — 1 app, 2 tool -->
+<!-- Bug #29: tab nav — 1 app, 3 tool -->
 <div class="tabs" role="tablist">
  <button type="button" class="tab active" id="tabBtnFoto" onclick="switchTab('foto')" role="tab" aria-selected="true">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -128,6 +182,10 @@
  <button type="button" class="tab" id="tabBtnPdf" onclick="switchTab('pdf')" role="tab" aria-selected="false">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6M9 9h2"/></svg>
   Kompres PDF
+ </button>
+ <button type="button" class="tab" id="tabBtnSet" onclick="switchTab('set')" role="tab" aria-selected="false">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  Pengaturan
  </button>
 </div>
 
@@ -326,6 +384,45 @@
   </button>
  </div>
 </div><!-- /tabPdf -->
+
+<!-- Bug #32+33: Tab Pengaturan — admin bisa ganti password admin & user, kunci app -->
+<div id="tabSet" style="display:none" role="tabpanel" aria-labelledby="tabBtnSet">
+ <section class="card">
+  <h2 id="h-set-admin">Ganti Password Admin</h2>
+  <p class="hint" style="margin-top:0">Hanya admin (Anda) yang bisa ganti password admin. Wajib verifikasi password admin lama.</p>
+  <label for="oldAdminPass">Password admin lama</label>
+  <input type="password" id="oldAdminPass" autocomplete="current-password">
+  <label for="newAdminPass">Password admin baru</label>
+  <input type="password" id="newAdminPass" autocomplete="new-password">
+  <label for="newAdminConfirm">Konfirmasi password admin baru</label>
+  <input type="password" id="newAdminConfirm" autocomplete="new-password">
+  <label class="chk"><input type="checkbox" id="adminShow" onchange="toggleAdminShow()"><span>Tampilkan password</span></label>
+  <div class="actions" style="margin-top:8px">
+   <button type="button" onclick="changeAdminPassword()">Ganti Password Admin</button>
+  </div>
+  <p class="hint" id="adminMsg" style="margin-top:8px;min-height:1.4em"></p>
+ </section>
+ <section class="card">
+  <h2 id="h-set-user">Ganti Password User</h2>
+  <p class="hint" style="margin-top:0">Admin bisa ganti password user (untuk orang lain) kapan saja. Tidak perlu password user lama (admin override). Beri tahu user password barunya secara terpisah.</p>
+  <label for="newUserPass">Password user baru</label>
+  <input type="password" id="newUserPass" autocomplete="new-password">
+  <label for="newUserConfirm">Konfirmasi password user baru</label>
+  <input type="password" id="newUserConfirm" autocomplete="new-password">
+  <label class="chk"><input type="checkbox" id="userShow" onchange="toggleUserShow()"><span>Tampilkan password</span></label>
+  <div class="actions" style="margin-top:8px">
+   <button type="button" onclick="changeUserPassword()">Ganti Password User</button>
+  </div>
+  <p class="hint" id="userMsg" style="margin-top:8px;min-height:1.4em"></p>
+ </section>
+ <section class="card">
+  <h2 id="h-set-lock">Kunci Aplikasi</h2>
+  <p class="hint" style="margin-top:0">Tekan tombol di bawah untuk mengunci aplikasi. Password wajib dimasukkan lagi untuk membuka.</p>
+  <div class="actions">
+   <button type="button" class="sec" onclick="lockApp()">Kunci Sekarang</button>
+  </div>
+ </section>
+</div><!-- /tabSet -->
 
 <script>
 const $=id=>document.getElementById(id);
@@ -1560,21 +1657,31 @@ const {PDFDocument, PDFName, PDFNumber, PDFRawStream}=PDFLib;
 let pdfBlob=null;       // Blob PDF hasil kompresi
 let namaHasilPdf='PDF_kompres.pdf';
 
-// Switch antara tab foto & tab PDF
+// Switch antara tab foto, PDF & Pengaturan
 function switchTab(name){
-  const foto=$('tabFoto'), pdf=$('tabPdf');
-  const btnFoto=$('tabBtnFoto'), btnPdf=$('tabBtnPdf');
+  // Bug #33: user role tidak bisa akses tab Pengaturan
+  if(name==='set' && sessionRole!=='admin') name='foto';
+  const foto=$('tabFoto'), pdf=$('tabPdf'), set=$('tabSet');
+  const btnFoto=$('tabBtnFoto'), btnPdf=$('tabBtnPdf'), btnSet=$('tabBtnSet');
   if(!foto||!pdf) return;
+  // Hide semua tab
+  foto.style.display='none';
+  pdf.style.display='none';
+  if(set) set.style.display='none';
+  // Reset semua button state
+  btnFoto.classList.remove('active'); btnFoto.setAttribute('aria-selected','false');
+  btnPdf.classList.remove('active'); btnPdf.setAttribute('aria-selected','false');
+  if(btnSet){ btnSet.classList.remove('active'); btnSet.setAttribute('aria-selected','false'); }
+  // Tampilkan tab terpilih
   if(name==='pdf'){
-    foto.style.display='none';
     pdf.style.display='block';
-    btnFoto.classList.remove('active'); btnFoto.setAttribute('aria-selected','false');
     btnPdf.classList.add('active'); btnPdf.setAttribute('aria-selected','true');
-  }else{
+  }else if(name==='set'){
+    if(set) set.style.display='block';
+    if(btnSet){ btnSet.classList.add('active'); btnSet.setAttribute('aria-selected','true'); }
+  }else{ // default: foto
     foto.style.display='block';
-    pdf.style.display='none';
     btnFoto.classList.add('active'); btnFoto.setAttribute('aria-selected','true');
-    btnPdf.classList.remove('active'); btnPdf.setAttribute('aria-selected','false');
   }
 }
 
@@ -1832,6 +1939,293 @@ function unduhPDF(){
   setTimeout(()=>URL.revokeObjectURL(u),15000);
   $('pdfSt').textContent='✅ PDF diunduh: '+namaHasilPdf;
 }
+
+/* ---------- Bug #32+33+34: Two-tier password + HARDENED security ----------
+   Bug #32: 2-tier (admin + user)
+   Bug #33: role-based tab visibility
+   Bug #34: HARDENING — ganti SHA-256 dgn skema yg jauh lebih sulit ditembus:
+     1. PBKDF2 100.000 iterasi (bukan SHA-256 sekali jalan) — brute-force 1000× lebih lambat
+     2. AES-GCM encrypted validation token — TIDAK ADA hash utk di-brute-force langsung.
+        Verifikasi password = coba decrypt token. AES-GCM auth tag gagal = password salah.
+     3. Random salt per instalasi (disimpan di localStorage) — mencegah rainbow table.
+     4. Lockout exponential backoff — 5 gagal → kunci 30s/1m/5m/15m/1h. Reset setelah sukses.
+     5. Session timeout 30 menit — auto-kunci bila tidak ada aktivitas.
+     6. Min 8 karakter password — wajib utk admin & user.
+   CATATAN JUJUR: proteksi client-side. Orang dgn akses fisik ke file HTML + localStorage
+   MASIH BISA brute-force offline (lambat, ~10 attempt/detik dgn PBKDF2 100k). Untuk
+   proteksi tak tembus seutuhnya, perlu enkripsi konten app (encrypt app code dgn password-
+   derived key) ATAU server-side auth. Tapi ini sudah jauh lebih kuat dr SHA-256 polos. ---------- */
+const ADMIN_KEY='appAdminToken_v1';    // base64 IV+encrypted token utk admin
+const USER_KEY='appUserToken_v1';      // base64 IV+encrypted token utk user
+const SALT_KEY='appSalt_v1';           // base64 random salt (shared admin+user, per instalasi)
+const FAIL_KEY='appFailCount_v1';     // jumlah upaya gagal
+const LOCK_KEY='appLockUntil_v1';     // timestamp kunci sampe
+const ACT_KEY='appLastActivity_v1';   // timestamp aktivitas terakhir
+const PBKDF2_ITER=100000;               // iterasi (100k = ~100ms per attempt di browser modern)
+const LOCKOUT_TIMES=[30000,60000,300000,900000,3600000];   // 30s, 1m, 5m, 15m, 1h
+const SESSION_TIMEOUT=30*60*1000;      // 30 menit
+const MIN_PASSWORD_LEN=8;
+
+let sessionRole=null;    // 'admin' | 'user' | null
+
+// --- util base64 <-> Uint8Array ---
+function toB64(bytes){ return btoa(String.fromCharCode.apply(null, bytes)); }
+function fromB64(str){
+  const bin=atob(str); const bytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+  return bytes;
+}
+
+// --- Random salt (16 byte) + token (32 byte) + IV (12 byte AES-GCM) ---
+function randomBytes(n){ const a=new Uint8Array(n); crypto.getRandomValues(a); return a; }
+
+// --- PBKDF2 key derivation: password + salt → AES-GCM 256-bit key ---
+async function deriveKEK(password, saltBytes){
+  const keyMaterial=await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2', salt:saltBytes, iterations:PBKDF2_ITER, hash:'SHA-256'},
+    keyMaterial,
+    {name:'AES-GCM', length:256},
+    false,
+    ['encrypt','decrypt']
+  );
+}
+
+// --- AES-GCM encrypt: return IV(12) + ciphertext + authTag ---
+async function encryptToken(kek, tokenBytes){
+  const iv=randomBytes(12);
+  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM', iv}, kek, tokenBytes));
+  const combined=new Uint8Array(iv.length+ct.length);
+  combined.set(iv,0); combined.set(ct,iv.length);
+  return combined;
+}
+// --- AES-GCM decrypt: parse IV + ciphertext, return plaintext (or throw jika auth gagal = password salah) ---
+async function decryptToken(kek, combined){
+  const iv=combined.slice(0,12);
+  const ct=combined.slice(12);
+  return crypto.subtle.decrypt({name:'AES-GCM', iv}, kek, ct);
+}
+
+// --- Salt getter (create once per install) ---
+function getSalt(){
+  let s=localStorage.getItem(SALT_KEY);
+  if(s) return fromB64(s);
+  const salt=randomBytes(16);
+  localStorage.setItem(SALT_KEY, toB64(salt));
+  return salt;
+}
+
+// --- Set password: generate random token, encrypt dgn KEK ---
+async function setAdminPassword(p){
+  const kek=await deriveKEK(p, getSalt());
+  const token=randomBytes(32);
+  const enc=await encryptToken(kek, token);
+  localStorage.setItem(ADMIN_KEY, toB64(enc));
+}
+async function setUserPassword(p){
+  const kek=await deriveKEK(p, getSalt());
+  const token=randomBytes(32);
+  const enc=await encryptToken(kek, token);
+  localStorage.setItem(USER_KEY, toB64(enc));
+}
+
+// --- Verify password: coba decrypt token. AES-GCM auth gagal = password salah ---
+async function verifyAdmin(p){
+  const stored=localStorage.getItem(ADMIN_KEY);
+  if(!stored) return false;
+  const kek=await deriveKEK(p, getSalt());
+  try{ await decryptToken(kek, fromB64(stored)); return true; }
+  catch(e){ return false; }
+}
+async function verifyUser(p){
+  const stored=localStorage.getItem(USER_KEY);
+  if(!stored) return false;
+  const kek=await deriveKEK(p, getSalt());
+  try{ await decryptToken(kek, fromB64(stored)); return true; }
+  catch(e){ return false; }
+}
+
+function isPasswordSet(){
+  return !!(localStorage.getItem(ADMIN_KEY) && localStorage.getItem(USER_KEY));
+}
+
+// --- Lockout: track failed attempts, exponential backoff ---
+function getLockStatus(){
+  const fails=parseInt(localStorage.getItem(FAIL_KEY)||'0',10);
+  const lockUntil=parseInt(localStorage.getItem(LOCK_KEY)||'0',10);
+  const now=Date.now();
+  if(lockUntil>now) return {locked:true, remaining:lockUntil-now, fails};
+  return {locked:false, fails};
+}
+function recordFailedAttempt(){
+  let fails=parseInt(localStorage.getItem(FAIL_KEY)||'0',10)+1;
+  localStorage.setItem(FAIL_KEY, String(fails));
+  if(fails>=5){
+    const idx=Math.min(LOCKOUT_TIMES.length-1, fails-5);
+    localStorage.setItem(LOCK_KEY, String(Date.now()+LOCKOUT_TIMES[idx]));
+  }
+  return fails;
+}
+function resetFails(){ localStorage.removeItem(FAIL_KEY); localStorage.removeItem(LOCK_KEY); }
+
+// --- Session timeout: track last activity ---
+function recordActivity(){
+  if(sessionRole!==null) localStorage.setItem(ACT_KEY, String(Date.now()));
+}
+function checkSessionTimeout(){
+  if(sessionRole===null) return;
+  const last=parseInt(localStorage.getItem(ACT_KEY)||'0',10);
+  if(last && Date.now()-last>SESSION_TIMEOUT){
+    lockApp();
+  }
+}
+
+// --- Login overlay show ---
+function showLogin(mode){
+  const ov=$('loginOverlay'); if(!ov) return;
+  ov.style.display='flex';
+  $('loginMode').style.display = (mode==='login') ? 'block' : 'none';
+  $('setupMode').style.display = (mode==='setup') ? 'block' : 'none';
+  const lp=$('loginPass'); if(lp) lp.value='';
+  const le=$('loginErr'); if(le) le.textContent='';
+  ['setupAdminPass','setupAdminConfirm','setupUserPass','setupUserConfirm'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
+  const se=$('setupErr'); if(se) se.textContent='';
+  ['loginShow','setupShow'].forEach(id=>{ const el=$(id); if(el) el.checked=false; });
+  ['loginPass','setupAdminPass','setupAdminConfirm','setupUserPass','setupUserConfirm'].forEach(id=>{ const el=$(id); if(el) el.type='password'; });
+  setTimeout(()=>{ try{ (mode==='login'?$('loginPass'):$('setupAdminPass')).focus(); }catch(e){} }, 50);
+}
+function hideLogin(){ $('loginOverlay').style.display='none'; }
+
+function showTabNav(){
+  const btnSet=$('tabBtnSet');
+  if(btnSet) btnSet.style.display = (sessionRole==='admin') ? 'inline-flex' : 'none';
+  if(sessionRole==='user') switchTab('foto');
+}
+
+// --- SETUP: first time buat password admin + user ---
+async function submitSetup(){
+  const ap=$('setupAdminPass').value, ac=$('setupAdminConfirm').value;
+  const up=$('setupUserPass').value, uc=$('setupUserConfirm').value;
+  const err=$('setupErr');
+  if(!ap||!ac||!up||!uc){ err.textContent='Semua kolom wajib diisi.'; return; }
+  if(ap!==ac){ err.textContent='Konfirmasi password admin tidak cocok.'; return; }
+  if(up!==uc){ err.textContent='Konfirmasi password user tidak cocok.'; return; }
+  if(ap.length<MIN_PASSWORD_LEN){ err.textContent='Password admin minimal '+MIN_PASSWORD_LEN+' karakter.'; return; }
+  if(up.length<MIN_PASSWORD_LEN){ err.textContent='Password user minimal '+MIN_PASSWORD_LEN+' karakter.'; return; }
+  if(ap===up){ err.textContent='Password admin & user tidak boleh sama.'; return; }
+  err.textContent='⏳ Mengenkripsi (PBKDF2 100k iter)...';
+  await setAdminPassword(ap);
+  await setUserPassword(up);
+  resetFails();
+  sessionRole='admin';
+  hideLogin();
+  showTabNav();
+  switchTab('foto');
+  recordActivity();
+}
+
+// --- LOGIN: cek lockout dulu, lalu verify ---
+async function submitLogin(){
+  const err=$('loginErr');
+  // Cek lockout
+  const lock=getLockStatus();
+  if(lock.locked){
+    const s=Math.ceil(lock.remaining/1000);
+    err.textContent='🔒 Terkunci. Coba lagi dalam '+s+' detik ('+lock.fails+' kali gagal).';
+    return;
+  }
+  const pass=$('loginPass').value;
+  if(!pass){ err.textContent='Password tidak boleh kosong.'; return; }
+  err.textContent='⏳ Memverifikasi (PBKDF2 100k iter)...';
+  if(await verifyAdmin(pass)){
+    sessionRole='admin'; resetFails(); hideLogin(); showTabNav(); switchTab('foto'); recordActivity();
+  }else if(await verifyUser(pass)){
+    sessionRole='user'; resetFails(); hideLogin(); showTabNav(); switchTab('foto'); recordActivity();
+  }else{
+    const fails=recordFailedAttempt();
+    let msg='Password salah. ('+fails+'× gagal)';
+    if(fails>=5){
+      const idx=Math.min(LOCKOUT_TIMES.length-1, fails-5);
+      const lockMs=LOCKOUT_TIMES[idx];
+      const s=Math.ceil(lockMs/1000);
+      msg='🔒 Terkunci '+s+' detik ('+fails+'× gagal). Password salah.';
+    }
+    err.textContent=msg;
+    $('loginPass').value=''; $('loginPass').focus();
+  }
+}
+
+function toggleLoginShow(){ const s=$('loginShow').checked; $('loginPass').type=s?'text':'password'; }
+function toggleSetupShow(){
+  const s=$('setupShow').checked;
+  ['setupAdminPass','setupAdminConfirm','setupUserPass','setupUserConfirm'].forEach(id=>{ const el=$(id); if(el) el.type=s?'text':'password'; });
+}
+function toggleAdminShow(){
+  const s=$('adminShow').checked;
+  ['oldAdminPass','newAdminPass','newAdminConfirm'].forEach(id=>{ const el=$(id); if(el) el.type=s?'text':'password'; });
+}
+function toggleUserShow(){
+  const s=$('userShow').checked;
+  ['newUserPass','newUserConfirm'].forEach(id=>{ const el=$(id); if(el) el.type=s?'text':'password'; });
+}
+
+// --- Ganti password admin (perlu password lama utk verifikasi) ---
+async function changeAdminPassword(){
+  const old=$('oldAdminPass').value, neu=$('newAdminPass').value, conf=$('newAdminConfirm').value;
+  const msg=$('adminMsg');
+  if(!old||!neu||!conf){ msg.textContent='⚠️ Semua kolom wajib diisi.'; return; }
+  if(neu!==conf){ msg.textContent='⚠️ Konfirmasi tidak cocok.'; return; }
+  if(neu.length<MIN_PASSWORD_LEN){ msg.textContent='⚠️ Password baru minimal '+MIN_PASSWORD_LEN+' karakter.'; return; }
+  msg.textContent='⏳ Memverifikasi password lama...';
+  if(!(await verifyAdmin(old))){ msg.textContent='⚠️ Password admin lama salah.'; return; }
+  msg.textContent='⏳ Mengenkripsi password baru...';
+  await setAdminPassword(neu);
+  msg.textContent='✅ Password admin diganti. Login berikutnya pakai password admin baru.';
+  $('oldAdminPass').value=''; $('newAdminPass').value=''; $('newAdminConfirm').value='';
+}
+
+// --- Ganti password user (admin override, tanpa password user lama) ---
+async function changeUserPassword(){
+  const neu=$('newUserPass').value, conf=$('newUserConfirm').value;
+  const msg=$('userMsg');
+  if(!neu||!conf){ msg.textContent='⚠️ Semua kolom wajib diisi.'; return; }
+  if(neu!==conf){ msg.textContent='⚠️ Konfirmasi tidak cocok.'; return; }
+  if(neu.length<MIN_PASSWORD_LEN){ msg.textContent='⚠️ Password user baru minimal '+MIN_PASSWORD_LEN+' karakter.'; return; }
+  msg.textContent='⏳ Mengenkripsi password user baru...';
+  await setUserPassword(neu);
+  msg.textContent='✅ Password user diganti. Beri tahu user password barunya secara terpisah.';
+  $('newUserPass').value=''; $('newUserConfirm').value='';
+}
+
+// --- Kunci app ---
+function lockApp(){
+  sessionRole=null;
+  localStorage.removeItem(ACT_KEY);
+  showLogin('login');
+  showTabNav();
+}
+
+// --- Activity tracking & session timeout ---
+function setupActivityTracking(){
+  ['mousemove','keydown','click','touchstart'].forEach(ev=>{
+    document.addEventListener(ev, ()=>{ if(sessionRole!==null) recordActivity(); }, {passive:true});
+  });
+  // Check tiap 60 detik
+  setInterval(()=>{ if(sessionRole!==null) checkSessionTimeout(); }, 60000);
+}
+
+// --- Init ---
+(async function initPassword(){
+  if(isPasswordSet()){
+    showLogin('login');
+  }else{
+    showLogin('setup');
+  }
+  showTabNav();
+  setupActivityTracking();
+})();
 </script>
 <script>
 /* ===== Latar bintang "warp" ===== */

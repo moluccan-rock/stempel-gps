@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="id" __gcrremoteframetoken="61f2cd38c3489f96cf2202ea7f841149"><head>
+<html lang="id" __gcrremoteframetoken="7b34a1e417362510e6f201c5fc9af1a1"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#02030a">
-<title>Suanggi Geotag (Auto EXIF Inject)</title>
+<title>Stempel Geotag Foto + Peta (Auto EXIF Inject)</title>
 <!-- Library membaca EXIF -->
 <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
 <!-- Library menulis/memasukkan EXIF -->
@@ -141,7 +141,7 @@
    <h2>Masuk Aplikasi</h2>
    <p>Masukkan <b>kode akses</b> yang diberikan admin. (Admin: masukkan password admin.)</p>
    <label for="loginPass">Kode akses / password admin</label>
-   <input type="text" id="loginPass" placeholder="Kode akses dari admin" autocomplete="off" autocapitalize="characters" onkeydown="if(event.key==='Enter')submitLogin()" __gcruniqueid="1">
+   <input type="password" id="loginPass" placeholder="Kode akses dari admin" autocomplete="off" autocapitalize="characters" onkeydown="if(event.key==='Enter')submitLogin()" __gcruniqueid="1">
    <button type="button" onclick="submitLogin()">Masuk</button>
    <p id="loginErr" class="login-err">⏳ Memverifikasi (PBKDF2 100k iter)...</p>
    <label class="chk"><input type="checkbox" id="loginShow" onchange="toggleLoginShow()"><span>Tampilkan</span></label>
@@ -399,16 +399,16 @@
   <h2 id="h-set-admin">Ganti Password Admin</h2>
   <p class="hint" style="margin-top:0">Password admin hanya bisa diubah oleh admin dari dashboard ini. Wajib verifikasi password admin lama.</p>
   <label for="oldAdminPass">Password admin lama</label>
-  <input type="password" id="oldAdminPass" autocomplete="current-password" __gcruniqueid="21">
+  <input type="text" id="oldAdminPass" autocomplete="current-password" __gcruniqueid="21">
   <label for="newAdminPass">Password admin baru</label>
-  <input type="password" id="newAdminPass" autocomplete="new-password" __gcruniqueid="22">
+  <input type="text" id="newAdminPass" autocomplete="new-password" __gcruniqueid="22">
   <label for="newAdminConfirm">Konfirmasi password admin baru</label>
-  <input type="password" id="newAdminConfirm" autocomplete="new-password" __gcruniqueid="23">
+  <input type="text" id="newAdminConfirm" autocomplete="new-password" __gcruniqueid="23">
   <label class="chk"><input type="checkbox" id="adminShow" onchange="toggleAdminShow()"><span>Tampilkan password</span></label>
   <div class="actions" style="margin-top:8px">
    <button type="button" onclick="changeAdminPassword()">Ganti Password Admin</button>
   </div>
-  <p class="hint" id="adminMsg" style="margin-top:8px;min-height:1.4em"></p>
+  <p class="hint" id="adminMsg" style="margin-top:8px;min-height:1.4em">✅ Password admin diganti. Kode akses user yang sudah dibuat tetap berlaku.</p>
  </section>
 <section class="card">
   <h2 id="h-set-user">Kode Akses User</h2>
@@ -419,12 +419,12 @@
    <button type="button" onclick="createAccessCode()">Buat Kode Akses</button>
   </div>
   <div id="newCodeBox" class="code-box" style="display:none">
-   <div class="code-for">Kode utk <b id="newCodeFor">s1s2s3</b> — salin sekarang, tidak akan ditampilkan lagi:</div>
+   <div class="code-for">Kode utk <b id="newCodeFor"></b> — salin sekarang, tidak akan ditampilkan lagi:</div>
    <div class="code-val" id="newCodeValue"></div>
    <button type="button" class="sec" onclick="copyAccessCode()">Salin Kode</button>
   </div>
-  <p class="hint" id="codeMsg" style="margin-top:8px;min-height:1.4em">✅ Kode disalin ke clipboard.</p>
-  <div id="codeList"><div class="code-row"><div class="code-info"><b>s1s2s3</b><span> · ID 2BVJ · dibuat 26/10/2026</span></div><button type="button" class="sec">Cabut</button></div></div>
+  <p class="hint" id="codeMsg" style="margin-top:8px;min-height:1.4em"></p>
+  <div id="codeList"><p class="hint">Belum ada kode akses. Buat kode di atas untuk memberi akses ke orang lain.</p></div>
  </section>
  <section class="card">
   <h2 id="h-set-lock">Kunci Aplikasi</h2>
@@ -2004,9 +2004,9 @@ const CODE_ID_LEN=4;
 // Embedded data — diisi oleh generatePublishedVersion() saat admin generate file distribusi.
 // Di mode dev (file asli), ini kosong — app pakai localStorage. Di mode published (file distribusi),
 // ini terisi. PUBLISHED_MODE auto-detek dari sini.
-const EMBEDDED_SALT='9Kk7kQa+48/LJibtkeVxNw==';
-const EMBEDDED_ADMIN_TOKEN='pwVPDvIw2khmTLeE3i/JH/K0n8dNVj0llMRAsKayUF8wVCDJaZrq2yYQzmL2BBeiupA8y3RQMSOCzRCW';
-const EMBEDDED_CODES='W3siaWQiOiIyQlZKIiwibGFiZWwiOiJzMXMyczMiLCJ0b2tlbiI6IlZFL29SaGlCcTJoWnRteW1IZklrV1R0RXBqeTY4N3l1RzdJQzFpZFMwZXRqSEc5dHIvTjdqeXlYblpOUEhqcnZGQlJHdnJDRUM4U2dZVVJTIiwiY3JlYXRlZCI6MTc5Mjk3ODg5NTgzMn1d';
+const EMBEDDED_SALT='blQM/tK3P2vbTADB9n+jkQ==';
+const EMBEDDED_ADMIN_TOKEN='058gcfOVrb2noP/WndQxwTms+y8cIKISkCSpOh5rmLWoDMtqLCrctB67K3Ke5gKqLHfllYNtVBQ1ULNB';
+const EMBEDDED_CODES='';
 const PUBLISHED_MODE=!!(EMBEDDED_SALT && EMBEDDED_ADMIN_TOKEN);
 
 let loginBusy=false;

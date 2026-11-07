@@ -1619,8 +1619,8 @@ async function bacaExifObj(file){
   try{ const o=piexif.load(await blobToDataURL(file)); const n=Object.keys(o['0th']||{}).length+Object.keys(o.Exif||{}).length+Object.keys(o.GPS||{}).length; return n?o:null; }
   catch(e){ return null; }
 }
-async function kompresGambar(file,target,opt,upd,batal){
-  if(file.size<=target) return {blob:file,status:'same',nama:file.name,info:`Sudah di bawah target (${fmt(file.size)} ≤ ${fmt(target)}) — tidak diubah.`};
+async function kompresGambarTurun(file,target,opt,upd,batal,paksa){
+  if(!paksa&&file.size<=target) return {blob:file,status:'same',nama:file.name,info:`Sudah di bawah target (${fmt(file.size)} ≤ ${fmt(target)}) — tidak diubah.`};
   const tipe=(file.type||'').toLowerCase(), nm=(file.name||'').toLowerCase();
   if(/heic|heif/.test(tipe)||/\.(heic|heif)$/.test(nm)) throw new Error('Format HEIC/HEIF tidak didukung browser. Ubah ke JPG dulu.');
   upd('Membuka gambar…');
@@ -1660,6 +1660,62 @@ async function kompresGambar(file,target,opt,upd,batal){
   const nama=baseName(file.name)+'_kompres.jpg';
   if(final.size<=target) return {blob:final,status:'ok',nama,info:`Hasil ${fmt(final.size)} ≤ target ${fmt(target)} (${pers}%)${tail}`};
   return {blob:final,status:'warn',nama,info:`Belum tercapai: hasil terkecil ${fmt(final.size)}, target ${fmt(target)}. Naikkan target sedikit.${tail}`};
+}
+
+
+/* ---- Pas-kan ukuran JPEG: sisipkan segmen komentar (COM) sebelum data gambar; tidak mengubah gambar ---- */
+async function padJpeg(blob,target){
+  const u=new Uint8Array(await blob.arrayBuffer());
+  let need=target-u.length; if(need<4||u[0]!==0xFF||u[1]!==0xD8) return blob;
+  let i=2;
+  while(i+3<u.length){
+    if(u[i]!==0xFF) break; const m=u[i+1];
+    if(m===0xDA) break;
+    if(m===0xD8||m===0x01||(m>=0xD0&&m<=0xD7)){ i+=2; continue; }
+    i+=2+((u[i+2]<<8)|u[i+3]);
+  }
+  if(i+1>=u.length||u[i]!==0xFF) return blob;
+  const parts=[u.subarray(0,i)];
+  while(need>0){
+    let seg=Math.min(need,65537);
+    if(need-seg>0&&need-seg<4) seg=need-4;
+    if(seg<4) break;
+    const h=new Uint8Array(seg); h[0]=0xFF; h[1]=0xFE; h[2]=((seg-2)>>8)&255; h[3]=(seg-2)&255;
+    parts.push(h); need-=seg;
+  }
+  parts.push(u.subarray(i));
+  return new Blob(parts,{type:'image/jpeg'});
+}
+/* Naikkan ukuran: JPEG asli tidak disandikan ulang (tanpa kehilangan kualitas); PNG/WebP jadi JPG kualitas tinggi */
+async function naikGambar(file,target,opt,upd,batal){
+  const tipe=(file.type||'').toLowerCase(), nm=(file.name||'').toLowerCase();
+  const isJpeg=/jpe?g/.test(tipe)||/\.jpe?g$/.test(nm);
+  if(!opt.pad) return {blob:file,status:'same',nama:file.name,info:`Sudah di bawah target (${fmt(file.size)} < ${fmt(target)}). Aktifkan "pas-kan ukuran" untuk menaikkannya.`};
+  let blob=file, nama=file.name, ket='file asli tidak disandikan ulang';
+  if(!isJpeg){
+    upd('Mengubah ke JPG…');
+    const bmp=await bukaBitmap(file,false);
+    const sw=bmp.naturalWidth||bmp.width, sh=bmp.naturalHeight||bmp.height;
+    const cv=document.createElement('canvas'); cv.width=sw; cv.height=sh;
+    const cx=cv.getContext('2d'); cx.fillStyle='#fff'; cx.fillRect(0,0,sw,sh); cx.drawImage(bmp,0,0);
+    if(bmp.close) try{bmp.close();}catch(e){}
+    blob=await toBlob(cv,0.95); cv.width=cv.height=0;
+    if(blob.size>target) return kompresGambarTurun(file,target,opt,upd,batal,true);
+    nama=baseName(file.name)+'_kompres.jpg'; ket=`diubah ke JPG ${sw}×${sh}px kualitas 95%`;
+  }else nama=baseName(file.name)+'_kompres.jpg';
+  upd('Menambah data pengisi sampai pas…');
+  const asal=blob.size, out=await padJpeg(blob,target);
+  return {blob:out,status:'ok',nama,info:`Dinaikkan ${fmt(file.size)} → ${fmt(out.size)} (target ${fmt(target)}, ${Math.round(out.size/target*100)}%) · ${ket} · +${fmt(out.size-asal)} data pengisi tak terlihat`};
+}
+async function kompresGambar(file,target,opt,upd,batal){
+  if(file.size===target) return {blob:file,status:'same',nama:file.name,info:`Ukuran sudah persis ${fmt(target)} — tidak diubah.`};
+  if(file.size<target) return naikGambar(file,target,opt,upd,batal);
+  const r=await kompresGambarTurun(file,target,opt,upd,batal,false);
+  if(opt.pad&&r.status==='ok'&&r.blob.size<target){
+    const asal=r.blob.size, out=await padJpeg(r.blob,target);
+    if(out.size<=target&&out.size>asal) return {...r,blob:out,info:r.info.replace(/^Hasil [^≤]+≤ target [^(]+\(\d+%\)/,`Hasil ${fmt(out.size)} = target ${fmt(target)} (100%)`)+` · +${fmt(out.size-asal)} data pengisi`};
+  }
+  return r;
 }
 
 /* =================== KOMPRES PDF =================== */
@@ -1864,7 +1920,7 @@ async function pdfTahapB(buf,target,upd,batal){
   return terbaik;
 }
 
-async function kompresPdf(file,target,opt,upd,batal){
+async function kompresPdfTurun(file,target,opt,upd,batal){
   if(!window.PDFLib) throw new Error('pdf-lib belum termuat (periksa internet)');
   if(file.size<=target) return {blob:file,status:'same',nama:file.name,info:`Sudah di bawah target (${fmt(file.size)} ≤ ${fmt(target)}) — tidak diubah.`};
   const buf=await file.arrayBuffer();
@@ -1903,6 +1959,44 @@ async function kompresPdf(file,target,opt,upd,batal){
     info:`PDF tidak bisa diperkecil lagi dengan cara ini (${fmt(file.size)}, target ${fmt(target)}). `+(opt.fallback==='B'?'Coba target lebih besar.':'Aktifkan opsi "ubah halaman jadi gambar" atau naikkan target.')};
 }
 
+/* Pas-kan ukuran PDF: tambah objek stream yatim berisi data pengisi (tidak tampil, tidak mengubah halaman) */
+async function padPdf(bytes,target){
+  const L=PDFLib; let n=0, terbaik=null;
+  for(let it=0;it<6;it++){
+    const doc=await L.PDFDocument.load(bytes,{updateMetadata:false});
+    if(n>0) doc.context.register(doc.context.stream(new Uint8Array(n)));
+    const out=await doc.save({useObjectStreams:false});
+    if(out.length<=target&&(!terbaik||out.length>terbaik.length)) terbaik=out;
+    const delta=target-out.length;
+    if(delta===0) break;
+    if(it===0&&delta<0) return null;           // simpan ulang malah lebih besar dari target
+    n=Math.max(1,n+delta-(it===0?90:0));
+    if(it>0&&Math.abs(delta)<=0) break;
+  }
+  return terbaik;
+}
+async function kompresPdf(file,target,opt,upd,batal){
+  if(!window.PDFLib) throw new Error('pdf-lib belum termuat (periksa internet)');
+  if(file.size===target) return {blob:file,status:'same',nama:file.name,info:`Ukuran sudah persis ${fmt(target)} — tidak diubah.`};
+  const nama=baseName(file.name)+'_kompres.pdf';
+  if(file.size<target){
+    if(!opt.pad) return {blob:file,status:'same',nama:file.name,info:`Sudah di bawah target (${fmt(file.size)} < ${fmt(target)}). Aktifkan "pas-kan ukuran" untuk menaikkannya.`};
+    upd('Menambah data pengisi sampai pas…');
+    let out;
+    try{ out=await padPdf(new Uint8Array(await file.arrayBuffer()),target); }
+    catch(e){ if(/encrypt/i.test(e.message)) throw new Error('PDF dilindungi sandi/terenkripsi. Buka proteksinya dulu.'); throw e; }
+    if(!out) return {blob:file,status:'warn',nama:file.name,info:'Gagal menaikkan ukuran PDF ini (struktur tidak bisa disimpan ulang).'};
+    return {blob:new Blob([out],{type:'application/pdf'}),status:'ok',nama,info:`Dinaikkan ${fmt(file.size)} → ${fmt(out.length)} (target ${fmt(target)}, ${Math.round(out.length/target*100)}%) · isi & teks PDF tidak berubah · +${fmt(out.length-file.size)} data pengisi tak terlihat`};
+  }
+  const r=await kompresPdfTurun(file,target,opt,upd,batal);
+  if(opt.pad&&r.status==='ok'&&r.blob.size<target){
+    upd('Menambah data pengisi sampai pas…');
+    const out=await padPdf(new Uint8Array(await r.blob.arrayBuffer()),target);
+    if(out&&out.length>r.blob.size) return {...r,blob:new Blob([out],{type:'application/pdf'}),info:r.info.replace(/^Hasil [^≤]+≤ target [^(]+\(\d+%\)/,`Hasil ${fmt(out.length)} = target ${fmt(target)} (100%)`)+` · +${fmt(out.length-r.blob.size)} data pengisi`};
+  }
+  return r;
+}
+
 /* =================== ANTARMUKA: 2 panel, antrean banyak file =================== */
 const IKON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 12v6m0 0 3-3m-3 3-3-3"/></svg>';
 const PANEL={
@@ -1910,14 +2004,14 @@ const PANEL={
     accept:'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp',
     cocok:f=>/^image\/(jpeg|png|webp)$/.test(f.type||'')||/\.(jpe?g|png|webp)$/i.test(f.name),
     judul:'Gambar (JPG / PNG / WebP)',
-    petunjuk:'Hasil selalu JPG. Ukuran diukur dari file sungguhan lalu disetel sampai mendekati target (≤ target). PNG/WebP yang sudah di bawah target tidak diubah.',
-    opsi:'<label class="chk"><input type="checkbox" id="kziExif" checked><span>Pertahankan metadata EXIF (GPS, tanggal, kamera) pada foto JPG. Ukuran EXIF sudah dihitung dalam target.</span></label>'},
+    petunjuk:'Bisa menurunkan DAN menaikkan ukuran sesuai target Anda. Hasil selalu JPG. Ukuran diukur dari file sungguhan, tidak pernah melebihi target.',
+    opsi:'<label class="chk"><input type="checkbox" id="kziExif" checked><span>Pertahankan metadata EXIF (GPS, tanggal, kamera) pada foto JPG. Ukuran EXIF sudah dihitung dalam target.</span></label>'+'<label class="chk"><input type="checkbox" id="kziPad" checked><span>Pas-kan ukuran persis ke target (menambah data pengisi tak terlihat; wajib aktif untuk MENAIKKAN ukuran).</span></label>'},
   pdf:{id:'kzPdf',p:'kzp',minKB:20,def:500,
     accept:'application/pdf,.pdf',
     cocok:f=>/pdf/i.test(f.type||'')||/\.pdf$/i.test(f.name),
     judul:'File PDF',
-    petunjuk:'Tahap 1: gambar di dalam PDF (JPEG, dan gambar mentah/Flate) dikompres ulang — teks dan struktur halaman tidak disentuh. Ukuran PDF hasil diukur nyata, lalu disetel ulang sampai mendekati target.',
-    opsi:'<div class="kz-row"><div class="kz-field"><label for="kzpFb">Jika target belum tercapai</label><select id="kzpFb"><option value="B" selected>Ubah halaman jadi gambar (target pasti tercapai, teks tidak bisa diseleksi)</option><option value="A">Berhenti — tampilkan hasil terbaik saja (teks tetap utuh)</option></select></div></div>'}
+    petunjuk:'Tahap 1: gambar di dalam PDF (JPEG, dan gambar mentah/Flate) dikompres ulang — teks dan struktur halaman tidak disentuh. Ukuran PDF hasil diukur nyata. Target lebih besar dari file asli juga bisa: ukuran dinaikkan tanpa mengubah isi.',
+    opsi:'<label class="chk"><input type="checkbox" id="kzpPad" checked><span>Pas-kan ukuran persis ke target (menambah data pengisi tak terlihat; wajib aktif untuk MENAIKKAN ukuran).</span></label><div class="kz-row"><div class="kz-field"><label for="kzpFb">Jika target belum tercapai</label><select id="kzpFb"><option value="B" selected>Ubah halaman jadi gambar (target pasti tercapai, teks tidak bisa diseleksi)</option><option value="A">Berhenti — tampilkan hasil terbaik saja (teks tetap utuh)</option></select></div></div>'}
 };
 const status={img:{items:[],jalan:false,batal:false},pdf:{items:[],jalan:false,batal:false}};
 
@@ -1931,7 +2025,7 @@ function bangunPanel(k){
    `<p class="hint" style="margin-top:8px">${c.petunjuk}</p></section>`+
    '<section class="card"><h2>2 · Target ukuran</h2>'+
    '<div class="kz-row">'+
-   `<div class="kz-field"><label for="${p}Target">Ukuran maksimum tiap file</label><input id="${p}Target" type="number" min="1" step="any" value="${c.def}" inputmode="decimal"></div>`+
+   `<div class="kz-field"><label for="${p}Target">Ukuran target tiap file</label><input id="${p}Target" type="number" min="1" step="any" value="${c.def}" inputmode="decimal"></div>`+
    `<div class="kz-field kz-unit"><label for="${p}Unit">Satuan</label><select id="${p}Unit"><option value="KB" selected>KB</option><option value="MB">MB</option></select></div>`+
    '</div>'+c.opsi+
    `<div class="actions"><button type="button" id="${p}Go" disabled>Mulai kompres</button>`+
@@ -2004,7 +2098,7 @@ async function mulai(k){
   if(s.jalan||!s.items.length) return;
   const t=ambilTarget(k);
   if(!t.ok){ q$(p+'St').textContent=`Target tidak valid (minimal ${c.minKB} KB).`; return; }
-  const opt=k==='img'?{keepExif:q$('kziExif').checked}:{fallback:q$('kzpFb').value};
+  const opt=k==='img'?{keepExif:q$('kziExif').checked,pad:q$('kziPad').checked}:{fallback:q$('kzpFb').value,pad:q$('kzpPad').checked};
   s.jalan=true; s.batal=false;
   s.items.forEach(i=>{i.st='wait';i.info='Menunggu';i.blob=null;});
   render(k);

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="id" __gcrremoteframetoken="7b34a1e417362510e6f201c5fc9af1a1"><head>
+<html lang="id">
+<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#02030a">
@@ -8,8 +9,10 @@
 <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
 <!-- Library menulis/memasukkan EXIF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/piexifjs/1.0.6/piexif.min.js"></script>
-<!-- Bug #29: pdf-lib utk kompres PDF (tab kedua dalam app) -->
+<!-- pdf-lib: baca/tulis PDF (tab Kompres Ukuran) -->
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<!-- JSZip: unduh banyak hasil kompres sekaligus (ZIP) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
  :root{
   --bg:#02030a; --surface:rgba(14,22,38,.93); --text:#e5e9f0; --muted:#a3afc2; --border:#2a3850;
@@ -66,7 +69,7 @@
   font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
  #cv{display:none;width:100%;height:auto;border:1px solid var(--border);border-radius:var(--radius);
   box-shadow:var(--shadow);background:var(--surface)}
- /* Bug #29: tab nav — gabung foto + PDF jadi 1 app */
+ /* tab nav: foto + kompres ukuran jadi 1 app */
  .tabs{display:flex;gap:6px;margin:0 0 16px;padding:4px;background:var(--surface);border:1px solid var(--border);
   border-radius:var(--radius)}
  .tab{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:8px 14px;
@@ -75,117 +78,65 @@
  .tab:hover{background:rgba(255,255,255,.05);color:var(--text)}
  .tab.active{background:var(--primary);color:var(--primary-fg)}
  .tab svg{width:18px;height:18px;flex:none}
- /* Bug #29: kompresor PDF dalam app */
- .pdf-drop{border:2px dashed var(--primary);border-radius:12px;padding:32px 16px;text-align:center;
-  background:rgba(45,212,191,.06);transition:background-color .18s ease,border-color .18s ease;cursor:pointer}
- .pdf-drop.dragover{background:rgba(45,212,191,.16);border-color:var(--primary-h)}
- .pdf-drop .pdf-icon{display:block;margin:0 auto 10px;width:44px;height:44px;color:var(--primary)}
- .pdf-drop p{margin:0;color:var(--muted);font-size:.875rem}
- .pdf-drop .pick{margin-top:14px;display:inline-block;background:var(--success);color:#052e16;
-  padding:9px 18px;border-radius:8px;font-weight:700;font-size:.9rem;cursor:pointer;border:0}
- .pdf-drop .picked{margin-top:12px;font-size:.85rem;color:var(--text);font-weight:600}
- .pdf-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin-top:18px}
- .pdf-field{display:flex;flex-direction:column;flex:1;min-width:140px}
- .pdf-field label{font-size:.75rem;color:var(--muted);font-weight:600;margin:0 0 6px}
- .pdf-field input,.pdf-field select{width:100%;min-height:42px;padding:8px 12px;font:inherit;color:var(--text);
-  background:var(--surface);border:1px solid var(--border);border-radius:8px}
- .pdf-field input:focus,.pdf-field select:focus{outline:3px solid var(--focus);outline-offset:2px}
- .pdf-unit{flex:0 0 90px}
- .pdf-go{background:var(--primary);color:var(--primary-fg);border:0;border-radius:8px;min-height:42px;padding:0 18px;
-  font:inherit;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
- .pdf-go:hover{background:var(--primary-h)}
- .pdf-go:disabled{opacity:.45;cursor:not-allowed}
- .pdf-st{margin-top:14px;text-align:center;font-size:.85rem;color:var(--muted);min-height:1.4em}
- .pdf-result{margin-top:14px;background:var(--info-bg);border:1px solid var(--info-bd);border-radius:8px;
-  padding:12px 14px;font-size:.8rem;line-height:1.7;display:none;white-space:pre-line;
-  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--text)}
- .pdf-download{margin-top:14px;text-align:center;display:none}
- .pdf-download button{background:var(--success);color:#052e16;border:0;border-radius:8px;min-height:44px;padding:0 22px;
-  font:inherit;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
- .pdf-download button:hover{background:var(--success-h)}
- .pdf-bar{margin-top:10px;height:5px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;display:none}
- .pdf-bar>div{height:100%;background:var(--primary);transition:width .25s ease;width:0}
- /* Bug #32: Login overlay — password gate */
- .login-overlay{position:fixed;inset:0;background:rgba(2,3,10,.96);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px;backdrop-filter:blur(4px)}
- .login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px 24px;max-width:360px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.5)}
- .login-card h2{margin:0 0 4px;font-size:1.25rem;font-weight:800;text-transform:none;letter-spacing:normal;color:var(--text)}
- .login-card p{margin:0 0 18px;color:var(--muted);font-size:.875rem;line-height:1.5}
- .login-card label{font-size:.8125rem;color:var(--muted);margin:10px 0 4px;font-weight:600}
- .login-card input[type=password],.login-card input[type=text]{width:100%;min-height:44px;padding:10px 12px;margin-bottom:8px;font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:8px}
- .login-card button{width:100%;margin-top:8px}
- .login-err{color:#fbbf24;font-size:.8125rem;margin:8px 0;min-height:1.2em;text-align:center}
- .login-card .chk{margin-top:12px;font-size:.8125rem;font-weight:400}
- /* Bug #33: floating lock button — visible to both admin & user */
- .lock-btn{position:fixed;top:12px;right:12px;background:var(--surface);color:var(--muted);border:1px solid var(--border);padding:7px 12px;min-height:36px;border-radius:8px;font-size:.8rem;font-weight:600;z-index:100;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
- .lock-btn:hover{background:var(--primary);color:var(--primary-fg);border-color:var(--primary)}
- .lock-btn svg{width:14px;height:14px;flex:none}
- /* Bug #36: kode akses */
- .code-box{margin-top:12px;padding:12px;border:1px solid var(--info-bd);background:var(--info-bg);border-radius:8px}
- .code-for{font-size:.8125rem;color:var(--muted);margin-bottom:8px}
- .code-val{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:1.35rem;font-weight:800;letter-spacing:.08em;color:var(--primary-h);word-break:break-all;user-select:all;margin-bottom:10px}
- .code-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px dashed var(--border);font-size:.875rem}
- .code-row:first-child{border-top:0}
- .code-info span{color:var(--muted);font-size:.8125rem}
- .code-row button{min-height:36px;padding:6px 14px}
+ /* ===== Tab Kompres Ukuran: 2 fungsi (Gambar / PDF), banyak file ===== */
+ .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+ .subtabs{display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap}
+ .subtab{flex:1;min-width:150px;min-height:44px;padding:8px 14px;background:var(--surface);color:var(--muted);
+  border:1px solid var(--border);border-radius:10px;cursor:pointer;font:inherit;font-weight:700;
+  transition:background-color .18s ease,color .18s ease,border-color .18s ease}
+ .subtab:hover{background:rgba(255,255,255,.06);color:var(--text)}
+ .subtab.active{background:var(--primary);color:var(--primary-fg);border-color:var(--primary)}
+ .kz-drop{display:block;border:2px dashed var(--primary);border-radius:12px;padding:24px 16px;text-align:center;
+  background:rgba(45,212,191,.06);transition:background-color .18s ease,border-color .18s ease;cursor:pointer;margin-top:8px}
+ .kz-drop:focus-within{outline:3px solid var(--focus);outline-offset:2px}
+ .kz-drop.dragover{background:rgba(45,212,191,.16);border-color:var(--primary-h)}
+ .kz-drop svg{display:block;margin:0 auto 8px;width:40px;height:40px;color:var(--primary)}
+ .kz-drop p{margin:0;color:var(--muted);font-size:.875rem}
+ .kz-drop .kz-pick{display:inline-block;margin-top:12px;background:var(--success);color:#052e16;padding:9px 18px;
+  border-radius:8px;font-weight:700;font-size:.9rem}
+ .kz-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin-top:10px}
+ .kz-field{display:flex;flex-direction:column;flex:1;min-width:140px}
+ .kz-field label{font-size:.75rem;color:var(--muted);font-weight:600;margin:0 0 6px}
+ .kz-unit{flex:0 0 90px}
+ .kz-bar{margin-top:12px;height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;display:none}
+ .kz-bar>div{height:100%;width:0;background:var(--primary);transition:width .25s ease}
+ .kz-st{margin-top:10px;font-size:.85rem;color:var(--muted);min-height:1.4em}
+ .kz-list{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}
+ .kz-item{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:rgba(255,255,255,.03)}
+ .kz-top{display:flex;gap:10px;justify-content:space-between;align-items:flex-start}
+ .kz-name{font-weight:600;font-size:.875rem;word-break:break-all}
+ .kz-size{font-size:.78rem;color:var(--muted);margin-top:2px}
+ .kz-info{font-size:.78rem;margin-top:6px;line-height:1.5;white-space:pre-line}
+ .kz-ok{color:var(--success)} .kz-warn{color:#fbbf24} .kz-err{color:#f87171} .kz-run{color:var(--primary)}
+ .kz-acts{display:flex;gap:6px;flex:none}
+ .kz-acts button{min-height:36px;padding:6px 12px;font-size:.8125rem}
  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
 <canvas id="bg" aria-hidden="true"></canvas>
-
-<!-- Bug #36: Login overlay — 2 mode: login (password admin / kode akses) & blocked (situs ter-host belum aktif). Password dibuat admin di tab Pengaturan, bukan di layar login. -->
-<div id="loginOverlay" class="login-overlay" style="display:none">
- <div class="login-card">
-  <!-- LOGIN MODE: password admin ATAU kode akses dari admin -->
-  <div id="loginMode" style="display: block;">
-   <h2>Masuk Aplikasi</h2>
-   <p>Masukkan <b>kode akses</b> yang diberikan admin. (Admin: masukkan password admin.)</p>
-   <label for="loginPass">Kode akses / password admin</label>
-   <input type="password" id="loginPass" placeholder="Kode akses dari admin" autocomplete="off" autocapitalize="characters" onkeydown="if(event.key==='Enter')submitLogin()" __gcruniqueid="1">
-   <button type="button" onclick="submitLogin()">Masuk</button>
-   <p id="loginErr" class="login-err">⏳ Memverifikasi (PBKDF2 100k iter)...</p>
-   <label class="chk"><input type="checkbox" id="loginShow" onchange="toggleLoginShow()"><span>Tampilkan</span></label>
-  </div>
-  <!-- BLOCKED MODE: situs ter-host tapi belum ada password/kode — setup dikunci -->
-  <div id="blockedMode" style="display:none">
-   <h2>Aplikasi Belum Aktif</h2>
-   <p>Aplikasi ini belum disiapkan oleh admin. Hubungi admin untuk mendapatkan link versi resmi beserta <b>kode akses</b> Anda.</p>
-  </div>
- </div>
-</div>
-
-<!-- Bug #33: floating lock button — siapa saja (admin/user) bisa kunci app kapan saja -->
-<button type="button" class="lock-btn" onclick="lockApp()" title="Kunci aplikasi" aria-label="Kunci aplikasi">
- <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
- Kunci
-</button>
-
 <header class="top">
  <h1>
-  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
   Stempel Geotag Foto + Peta
  </h1>
  <p>Stempel visual di gambar, plus metadata EXIF yang sama di dalam file.</p>
 </header>
 
-<!-- Bug #29: tab nav — 1 app, 3 tool -->
+<!-- tab nav — 1 app, 2 tool -->
 <div class="tabs" role="tablist">
- <button type="button" class="tab" id="tabBtnFoto" onclick="switchTab('foto')" role="tab" aria-selected="false">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+ <button type="button" class="tab active" id="tabBtnFoto" onclick="switchTab('foto')" role="tab" aria-selected="true">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
   Stempel Geotag Foto
  </button>
- <button type="button" class="tab" id="tabBtnPdf" onclick="switchTab('pdf')" role="tab" aria-selected="false">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M9 13h6M9 17h6M9 9h2"></path></svg>
-  Kompres PDF
- </button>
- <button type="button" class="tab active" id="tabBtnSet" onclick="switchTab('set')" role="tab" aria-selected="true" style="display: inline-flex;">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-  Pengaturan
+ <button type="button" class="tab" id="tabBtnKompres" onclick="switchTab('kompres')" role="tab" aria-selected="false">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6M9 9h2"/></svg>
+  Kompres Ukuran
  </button>
 </div>
 
 <!-- Tab Foto -->
-<div id="tabFoto" style="display: none;">
+<div id="tabFoto">
 
 <section class="card" aria-labelledby="h-foto">
  <h2 id="h-foto">1 · Foto</h2>
@@ -197,35 +148,35 @@
 <section class="card" aria-labelledby="h-lokasi">
  <h2 id="h-lokasi">2 · Lokasi</h2>
  <label for="nama">Nama tempat / baris besar (format: Kota, Provinsi, Indonesia)</label>
- <input id="nama" value="Ambon, Maluku, Indonesia" autocomplete="off" __gcruniqueid="2">
+ <input id="nama" value="Ambon, Maluku, Indonesia" autocomplete="off">
  <p class="hint" style="margin-top:4px">Baris besar di stempel — pakai format "Kota, Provinsi, Indonesia". Otomatis terisi saat cari alamat/koordinat.</p>
  <label for="alamat">Alamat detail (jalan, lorong/RT, kelurahan, kecamatan, kota)</label>
- <input id="alamat" value="Jalan, RT/RW, Kelurahan, Kecamatan, Kota" autocomplete="off" __gcruniqueid="3">
+ <input id="alamat" value="Jalan, RT/RW, Kelurahan, Kecamatan, Kota" autocomplete="off">
  <p class="hint" style="margin-top:4px">Alamat lengkap untuk persamaan metadata. Otomatis dicari dari internet (OpenStreetMap) berdasarkan koordinat paling dekat.</p>
  <div class="actions">
   <button type="button" class="sec" id="btnCari" onclick="cariKoordinat()">
-   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
    Cari koordinat &amp; alamat
   </button>
   <button type="button" class="sec" id="btnReverse" onclick="cariAlamat()">
-   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12c0 5-4 9-9 9s-9-4-9-9 4-9 9-9c2 0 4 .7 5.5 2"></path><path d="M21 3v5h-5"></path></svg>
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12c0 5-4 9-9 9s-9-4-9-9 4-9 9-9c2 0 4 .7 5.5 2"/><path d="M21 3v5h-5"/></svg>
    Cari alamat dari koordinat
   </button>
   <button type="button" class="sec" onclick="lokasiSaya()">
-   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path><circle cx="12" cy="12" r="8"></circle></svg>
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
    Pakai GPS perangkat
   </button>
   <button type="button" class="sec" id="btnAcak" onclick="cariLokasiAcak()">
-   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"></rect><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"></circle><circle cx="15.5" cy="15.5" r="1.5" fill="currentColor"></circle><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor"></circle><circle cx="8.5" cy="15.5" r="1.5" fill="currentColor"></circle><circle cx="12" cy="12" r="1.5" fill="currentColor"></circle></svg>
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
    Lokasi acak terdekat
   </button>
  </div>
  <hr>
  <div class="row">
-  <div><label for="lat">Latitude</label><input id="lat" value="-3.6934" inputmode="decimal" __gcruniqueid="4"></div>
-  <div><label for="lng">Longitude</label><input id="lng" value="128.1818" inputmode="decimal" __gcruniqueid="5"></div>
+  <div><label for="lat">Latitude</label><input id="lat" value="-3.6934" inputmode="decimal"></div>
+  <div><label for="lng">Longitude</label><input id="lng" value="128.1818" inputmode="decimal"></div>
   <div><label for="zoom">Zoom peta</label>
-   <select id="zoom" __gcruniqueid="6"><option>13</option><option>14</option><option selected="">15</option><option>16</option><option>17</option></select>
+   <select id="zoom"><option>13</option><option>14</option><option selected>15</option><option>16</option><option>17</option></select>
   </div>
   <div><label>Radius acak</label>
    <div id="radiusAcak" style="padding:.46rem .6rem;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);border-radius:6px;color:#cfd9e6;font-size:.82rem">100 – 200 m</div>
@@ -240,15 +191,15 @@
   <div><label for="tgl">Tanggal</label><input id="tgl" type="date"></div>
   <div><label for="jam">Jam</label><input id="jam" type="time"></div>
   <div><label for="tz">Zona waktu</label>
-   <select id="tz" __gcruniqueid="7">
+   <select id="tz">
     <option value="WIB">WIB (+07:00)</option>
     <option value="WITA">WITA (+08:00)</option>
-    <option value="WIT" selected="">WIT (+09:00)</option>
+    <option value="WIT" selected>WIT (+09:00)</option>
    </select>
   </div>
  </div>
  <label for="note">Note kegiatan (tampil di bawah tanggal &amp; waktu pada foto)</label>
- <input id="note" value="Created by cam-stempel-GPS" autocomplete="off" maxlength="90" __gcruniqueid="8">
+ <input id="note" value="Created by cam-stempel-GPS" autocomplete="off" maxlength="90">
  <p class="hint" style="margin-top:4px">Catatan singkat kegiatan — akan tampil sebagai baris terakhir di stempel foto dan tersimpan di EXIF UserComment. Default: "Created by cam-stempel-GPS".</p>
 </section>
 
@@ -256,16 +207,16 @@
  <h2 id="h-kamera">4 · Metadata Kamera</h2>
  <p class="hint" style="margin-top:0">Metadata kamera dipakai supaya foto tidak terdeteksi sebagai hasil edit. Diisi otomatis dari EXIF asli bila ada.</p>
  <div class="row">
-  <div><label for="make">Merek HP</label><input id="make" value="samsung" autocomplete="off" __gcruniqueid="9"></div>
-  <div><label for="model">Tipe HP</label><input id="model" value="SM-A325F" autocomplete="off" __gcruniqueid="10"></div>
-  <div><label for="alt">Altitude (m)</label><input id="alt" type="number" step="0.1" value="0" inputmode="decimal" __gcruniqueid="11"></div>
+  <div><label for="make">Merek HP</label><input id="make" value="samsung" autocomplete="off"></div>
+  <div><label for="model">Tipe HP</label><input id="model" value="SM-A325F" autocomplete="off"></div>
+  <div><label for="alt">Altitude (m)</label><input id="alt" type="number" step="0.1" value="0" inputmode="decimal"></div>
  </div>
  <label class="chk">
-  <input type="checkbox" id="keepExif" checked="">
+  <input type="checkbox" id="keepExif" checked>
   <span>Pertahankan metadata kamera asli (ExposureTime, FNumber, ISO, FocalLength, dll.) bila foto JPG punya EXIF. GPS &amp; waktu akan ditimpa dengan isian Anda.</span>
  </label>
  <label class="chk">
-  <input type="checkbox" id="keepImgDesc" checked="">
+  <input type="checkbox" id="keepImgDesc" checked>
   <span>Sertakan ImageDescription (judul - alamat) di EXIF. Sebagian sistem memeriksa field ini untuk verifikasi tempat.</span>
  </label>
  <div class="warn" id="metaWarn" style="display:none"></div>
@@ -275,8 +226,8 @@
  <h2 id="h-hasil">5 · Hasil</h2>
  <div class="row" style="margin-top:4px">
   <div><label for="resizeMode">Ukuran foto (lebar px)</label>
-   <select id="resizeMode" onchange="toggleResizeCustom()" __gcruniqueid="12">
-    <option value="asli" selected="">Asli (tanpa resize)</option>
+   <select id="resizeMode" onchange="toggleResizeCustom()">
+    <option value="asli" selected>Asli (tanpa resize)</option>
     <option value="640">640 px</option>
     <option value="1024">1024 px</option>
     <option value="1280">1280 px</option>
@@ -287,15 +238,15 @@
   </div>
   <div id="resizeCustomWrap" style="display:none">
    <label for="resizeCustom">Lebar target (px)</label>
-   <input id="resizeCustom" type="number" min="320" max="4096" step="10" value="1280" inputmode="numeric" __gcruniqueid="13">
+   <input id="resizeCustom" type="number" min="320" max="4096" step="10" value="1280" inputmode="numeric">
   </div>
  </div>
  <p class="hint" style="margin-top:8px">Foto kecil bisa <b>diperbesar</b> (upscale) dan foto besar bisa <b>diperkecil</b> (downscale) — tinggi mengikuti otomatis (rasio asli dipertahankan). "Asli" = tanpa resize (maks 2000 px). Catatan: ini atur dimensi pixel. Untuk <b>naikkan ukuran file di disk</b> (mis. 130 KB → 750 KB), pakai mode "Naikkan ke ≈ target" di bawah. Upscale dimensi besar bisa terlihat agak lembut — gunakan seperlunya.</p>
  <div class="row" style="margin-top:4px">
   <div><label for="ukuranMode">Target ukuran file</label>
-   <select id="ukuranMode" onchange="toggleUkuranCustom()" __gcruniqueid="14">
+   <select id="ukuranMode" onchange="toggleUkuranCustom()">
     <option value="500">&lt; 500 KB (batas atas)</option>
-    <option value="1000" selected="">&lt; 1 MB (batas atas)</option>
+    <option value="1000" selected>&lt; 1 MB (batas atas)</option>
     <option value="custom">Atur sendiri (batas atas)</option>
     <option value="upscale">Naikkan ke ≈ target</option>
     <option value="0">Tanpa batas (kualitas penuh)</option>
@@ -303,11 +254,11 @@
   </div>
   <div id="ukuranCustomWrap" style="display:none">
    <label for="ukuranCustom">Maksimum (KB)</label>
-   <input id="ukuranCustom" type="number" min="50" max="20000" step="50" value="750" inputmode="numeric" __gcruniqueid="15">
+   <input id="ukuranCustom" type="number" min="50" max="20000" step="50" value="750" inputmode="numeric">
   </div>
   <div><label for="bolehDownscale">Kecilkan dimensi?</label>
-   <select id="bolehDownscale" __gcruniqueid="16">
-    <option value="1" selected="">Boleh (jika perlu)</option>
+   <select id="bolehDownscale">
+    <option value="1" selected>Boleh (jika perlu)</option>
     <option value="0">Pertahankan dimensi asli</option>
    </select>
   </div>
@@ -315,11 +266,11 @@
  <p class="hint" style="margin-top:8px">Urutan proses saat klik <b>"Buat geotag"</b>: (1) foto di-resize ke lebar target di atas (bisa perbesar/perkecil), (2) stempel geotag digambar, (3) ukuran file diproses sesuai mode: <b>batas atas</b> (kompresi kualitas+dimensi sampai di bawah target) / <b>Naikkan ke ≈ target</b> (kualitas &amp; dimensi dinaikkan utk mendekati target bila foto asli lebih kecil — mis. 130 KB → ≈ 750 KB) / <b>Tanpa batas</b> (kualitas penuh).</p>
  <div class="actions" style="margin-top:8px">
   <button type="button" id="btnBuat" onclick="buatGeotag()">
-   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
    Buat geotag
   </button>
-  <button type="button" class="dl" id="btnDl" style="display:none" onclick="unduh()" disabled="">
-   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"></path></svg>
+  <button type="button" class="dl" id="btnDl" style="display:none" onclick="unduh()" disabled>
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>
    Download JPG + EXIF
   </button>
  </div>
@@ -332,125 +283,15 @@
 
 </div><!-- /tabFoto -->
 
-<!-- Bug #29: Tab Kompres PDF — dipanggil lewat tab nav, 1 app bersama foto -->
-<div id="tabPdf" style="display:none" role="tabpanel" aria-labelledby="tabBtnPdf">
- <section class="card">
-  <h2>1 · Pilih PDF</h2>
-  <!-- Bug #30: div onclick langsung (bukan label+button) — klik mana saja di kotak ini = buka file picker -->
-  <div class="pdf-drop" id="pdfDrop" onclick="pdfPickerClick()" role="button" tabindex="0" aria-label="Pilih atau seret PDF" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pdfPickerClick();}">
-   <svg class="pdf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M9 13h6M9 17h6M9 9h2"></path></svg>
-   <p id="pdfDropHint">Pilih atau seret &amp; jatuhkan PDF di sini</p>
-   <span class="pick">Pilih PDF</span>
-   <div class="picked" id="pdfPicked" style="display:none"></div>
-  </div>
-  <input type="file" id="pdf" accept="application/pdf,.pdf" style="display:none">
-  <p class="hint" style="margin-top:8px">Klik mana saja di kotak ungu di atas = langsung buka file picker. Cocok utk PDF hasil scan / dokumen dgn banyak gambar. Teks &amp; struktur PDF tetap utuh.</p>
- </section>
-
- <section class="card">
-  <h2>2 · Target Ukuran</h2>
-  <div class="pdf-row">
-   <div class="pdf-field">
-    <label for="pdfTarget">Ukuran target</label>
-    <input id="pdfTarget" type="number" min="10" max="50000" step="10" value="500" inputmode="numeric" __gcruniqueid="17">
-   </div>
-   <div class="pdf-field pdf-unit">
-    <label for="pdfUnit">&nbsp;</label>
-    <select id="pdfUnit" __gcruniqueid="18">
-     <option value="KB" selected="">KB</option>
-     <option value="MB">MB</option>
-    </select>
-   </div>
-   <button type="button" class="pdf-go" id="pdfGo" onclick="kompresPDF()" disabled="">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"></path></svg>
-    Kompres PDF
-   </button>
-  </div>
-  <p class="hint" style="margin-top:8px">App akan binary-search kualitas JPEG (0.3–0.95) + auto-fallback skala 1.0→0.75→0.5 utk mendekati target. Teks &amp; struktur halaman PDF TIDAK disentuh.</p>
- </section>
-
- <div class="pdf-bar" id="pdfBar"><div></div></div>
- <p class="pdf-st" id="pdfSt">Pilih PDF untuk mulai.</p>
- <div class="pdf-result" id="pdfResult"></div>
- <div class="pdf-download" id="pdfDownload">
-  <button type="button" onclick="unduhPDF()">
-   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"></path></svg>
-   Download PDF
-  </button>
+<!-- Tab Kompres Ukuran: 2 fungsi — Gambar (JPG/PNG/WebP) dan File PDF; banyak file sekaligus -->
+<div id="tabKompres" style="display:none" role="tabpanel" aria-labelledby="tabBtnKompres">
+ <div class="subtabs" role="tablist" aria-label="Jenis kompres">
+  <button type="button" class="subtab active" id="kzBtnImg" role="tab" aria-selected="true">Kompres Gambar (JPG / PNG / WebP)</button>
+  <button type="button" class="subtab" id="kzBtnPdf" role="tab" aria-selected="false">Kompres File PDF</button>
  </div>
-</div><!-- /tabPdf -->
-
-<!-- Bug #32+33: Tab Pengaturan — admin bisa ganti password admin & user, kunci app -->
-<div id="tabSet" style="display: block;" role="tabpanel" aria-labelledby="tabBtnSet">
- <section class="card" id="createAdminSection" style="display: none;">
-  <h2 id="h-set-create">Buat Password Admin</h2>
-  <p class="hint" style="margin-top:0">⚠️ <b>Aplikasi belum dikunci.</b> Buat password admin SEKALI di sini. Setelah dibuat, aplikasi terkunci dan hanya bisa dibuka dgn password ini (admin) atau Kode Akses yang Anda buat di bawah. Min 8 karakter, disarankan campuran huruf besar/kecil/angka/simbol.</p>
-  <label for="createAdminPass">Password admin</label>
-  <input type="text" id="createAdminPass" autocomplete="new-password" __gcruniqueid="19">
-  <label for="createAdminConfirm">Konfirmasi password admin</label>
-  <input type="text" id="createAdminConfirm" autocomplete="new-password" onkeydown="if(event.key==='Enter')createAdminPassword()" __gcruniqueid="20">
-  <label class="chk"><input type="checkbox" id="createShow" onchange="toggleCreateShow()"><span>Tampilkan password</span></label>
-  <div class="actions" style="margin-top:8px">
-   <button type="button" onclick="createAdminPassword()">Buat Password Admin</button>
-  </div>
-  <p class="hint" id="createMsg" style="margin-top:8px;min-height:1.4em">✅ Password admin dibuat. Aplikasi sekarang terkunci — berikutnya masuk dgn password ini. Buat Kode Akses utk orang lain di bawah.</p>
- </section>
- <section class="card" id="changeAdminSection" style="display: block;">
-  <h2 id="h-set-admin">Ganti Password Admin</h2>
-  <p class="hint" style="margin-top:0">Password admin hanya bisa diubah oleh admin dari dashboard ini. Wajib verifikasi password admin lama.</p>
-  <label for="oldAdminPass">Password admin lama</label>
-  <input type="text" id="oldAdminPass" autocomplete="current-password" __gcruniqueid="21">
-  <label for="newAdminPass">Password admin baru</label>
-  <input type="text" id="newAdminPass" autocomplete="new-password" __gcruniqueid="22">
-  <label for="newAdminConfirm">Konfirmasi password admin baru</label>
-  <input type="text" id="newAdminConfirm" autocomplete="new-password" __gcruniqueid="23">
-  <label class="chk"><input type="checkbox" id="adminShow" onchange="toggleAdminShow()"><span>Tampilkan password</span></label>
-  <div class="actions" style="margin-top:8px">
-   <button type="button" onclick="changeAdminPassword()">Ganti Password Admin</button>
-  </div>
-  <p class="hint" id="adminMsg" style="margin-top:8px;min-height:1.4em">✅ Password admin diganti. Kode akses user yang sudah dibuat tetap berlaku.</p>
- </section>
-<section class="card">
-  <h2 id="h-set-user">Kode Akses User</h2>
-  <p class="hint" style="margin-top:0">Buat <b>satu kode per orang</b>. Kode hanya tampil SEKALI saat dibuat — salin lalu kirim ke orangnya. User masuk dgn kode ini (tidak bisa ganti password &amp; tidak bisa buka Pengaturan). Anda bisa mencabut kode kapan saja.</p>
-  <label for="codeLabel">Nama penerima kode</label>
-  <input id="codeLabel" maxlength="40" placeholder="mis. Budi - Puskesmas A" autocomplete="off" onkeydown="if(event.key==='Enter')createAccessCode()" __gcruniqueid="24">
-  <div class="actions" style="margin-top:8px">
-   <button type="button" onclick="createAccessCode()">Buat Kode Akses</button>
-  </div>
-  <div id="newCodeBox" class="code-box" style="display:none">
-   <div class="code-for">Kode utk <b id="newCodeFor"></b> — salin sekarang, tidak akan ditampilkan lagi:</div>
-   <div class="code-val" id="newCodeValue"></div>
-   <button type="button" class="sec" onclick="copyAccessCode()">Salin Kode</button>
-  </div>
-  <p class="hint" id="codeMsg" style="margin-top:8px;min-height:1.4em"></p>
-  <div id="codeList"><p class="hint">Belum ada kode akses. Buat kode di atas untuk memberi akses ke orang lain.</p></div>
- </section>
- <section class="card">
-  <h2 id="h-set-lock">Kunci Aplikasi</h2>
-  <p class="hint" style="margin-top:0">Tekan tombol di bawah untuk mengunci aplikasi. Password wajib dimasukkan lagi untuk membuka.</p>
-  <div class="actions">
-   <button type="button" class="sec" onclick="lockApp()">Kunci Sekarang</button>
-  </div>
- </section>
- <section class="card" id="publishSection">
-  <h2 id="h-set-publish">Generate Versi Distribusi (untuk GitHub)</h2>
-  <p class="hint" style="margin-top:0">Tombol ini menghasilkan file <b>index.html</b> baru dgn password admin + semua <b>Kode Akses</b> TERTANAM (terenkripsi). Upload hasilnya ke GitHub. Orang lain hanya bisa masuk dgn <b>kode akses dari Anda</b> — tidak ada halaman buat-password utk mereka.</p>
-  <p class="hint"><b>Cara pakai:</b><br>
-  1. Buat kode akses utk tiap orang di section di atas (salin &amp; kirim ke orangnya)<br>
-  2. Klik tombol di bawah → download <b>index.html</b> (versi distribusi)<br>
-  3. Upload ke GitHub repo (replace index.html lama)<br>
-  4. Kirim link GitHub + kode akses masing-masing ke user<br>
-  5. User buka link → masukkan kodenya → pakai app
-  </p>
-  <p class="hint"><b>Tambah / cabut kode:</b> buka file ASLI (sebelum publish, simpan baik-baik) di komputer Anda, tambah atau cabut kode, lalu generate ulang &amp; upload ulang. Kode lama yang dicabut berhenti berlaku setelah file baru terpasang.</p>
-  <p class="hint">⚠️ File hasil memuat token terenkripsi (AES-GCM, PBKDF2 100k) + nama penerima kode (terlihat jika file dibaca) — pakai nama panggilan saja. Pakai password admin yang kuat (min 12 karakter). Ini aplikasi statis tanpa server, jadi pembatasan bersifat sisi-klien.</p>
-  <div class="actions">
-   <button type="button" onclick="generatePublishedVersion()">📦 Generate index.html (Published)</button>
-  </div>
-  <p class="hint" id="publishMsg" style="margin-top:8px;min-height:1.4em">⏳ Menyiapkan file distribusi...</p>
- </section>
-</div><!-- /tabSet -->
+ <div id="kzImg" role="tabpanel"></div>
+ <div id="kzPdf" role="tabpanel" style="display:none"></div>
+</div><!-- /tabKompres -->
 
 <script>
 const $=id=>document.getElementById(id);
@@ -460,7 +301,6 @@ const MAX_IMG_SIZE = 2000;          // Bug #18: naikkan 1200 -> 2000 (lebih ting
 const JPEG_QUALITY = 0.95;          // Bug #18: naikkan 0.92 -> 0.95 (lebih sedikit kompresi)
 const TZ_OFFSET = {WIB:7, WITA:8, WIT:9};
 
-let sessionRole=null;    // 'admin' | 'user' | null (dideklarasikan paling awal agar aman dipakai switchTab)
 let img=null;
 let renderToken=0;
 let lastMeta=null;
@@ -524,11 +364,11 @@ function dmsToDec(dms,ref){
 }
 function ascii(s){
   return String(s)
-    .replace(/[\u2018\u2019]/g,"'")   // Bug #23: kutip tunggal tipografis -> ASCII
-    .replace(/[\u201C\u201D]/g,'"')     // kutip ganda tipografis -> ASCII
-    .replace(/[\u2013\u2014]/g,'-')     // en/em dash -> tanda hubung
-    .replace(/\u2026/g,'...')           // ellipsis
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[‘’]/g,"'")   // Bug #23: kutip tunggal tipografis -> ASCII
+    .replace(/[“”]/g,'"')     // kutip ganda tipografis -> ASCII
+    .replace(/[–—]/g,'-')     // en/em dash -> tanda hubung
+    .replace(/…/g,'...')           // ellipsis
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
     .replace(/[^\x20-\x7E]/g,'?');
 }
 
@@ -810,8 +650,8 @@ async function cariLokasiAcak(){
     const baru=offsetAcak(k.lat,k.lng,minM,maxM);
     $('lat').value=baru.lat.toFixed(6);
     $('lng').value=baru.lng.toFixed(6);
-    exifNote=` (titik acak ${minM}\u2013${maxM} m dari koordinat sebelumnya)`;
-    setStatus(`🎲 Titik acak dibuat (${minM}\u2013${maxM} m). Mencari alamat terdekat...`);
+    exifNote=` (titik acak ${minM}–${maxM} m dari koordinat sebelumnya)`;
+    setStatus(`🎲 Titik acak dibuat (${minM}–${maxM} m). Mencari alamat terdekat...`);
     if(img) render();
     await delay(400);
     await cariAlamat();
@@ -824,18 +664,18 @@ async function cariLokasiAcak(){
   // Bug #25: radius tetap 100–200 m; mengecil otomatis kalau kandidat keluar kecamatan (dekat batas).
   const tahap=[[100,200,2],[50,100,2],[20,50,1],[5,20,1]];
   let diterima=null, hasilReverse=null, rentang='';
-  setStatus(`🎲 Membuat titik acak 100\u2013200 m dari titik alamat — dikunci di kecamatan ${kec}...`);
+  setStatus(`🎲 Membuat titik acak 100–200 m dari titik alamat — dikunci di kecamatan ${kec}...`);
 
   for(const [minM,maxM,nCoba] of tahap){
     for(let n=0;n<nCoba;n++){
       const cand=offsetAcak(base.lat,base.lng,minM,maxM);
-      setStatus(`🎲 Menguji titik acak ${minM}\u2013${maxM} m dari titik alamat (kecamatan ${kec})...`);
+      setStatus(`🎲 Menguji titik acak ${minM}–${maxM} m dari titik alamat (kecamatan ${kec})...`);
       try{
         const res=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${cand.lat.toFixed(6)}&lon=${cand.lng.toFixed(6)}&addressdetails=1&zoom=18&accept-language=id`);
         if(!res.ok) throw new Error('HTTP '+res.status);
         const data=await res.json();
         if(data&&data.address&&samaNama(ambilKecamatan(data.address),kec)){
-          diterima=cand; hasilReverse=data; rentang=`${minM}\u2013${maxM}`;
+          diterima=cand; hasilReverse=data; rentang=`${minM}–${maxM}`;
           break;
         }
       }catch(err){ /* gagal jaringan: coba kandidat berikutnya */ }
@@ -1679,780 +1519,556 @@ const jadwal=()=>{
   el.addEventListener('change',jadwal);
 });
 
-/* ---------- Bug #29: Tab nav + kompresor PDF (gabung 1 app) ---------- */
-// Alias class pdf-lib dari global PDFLib
-// Dibuat aman: kalau CDN pdf-lib gagal dimuat (offline/diblokir), sisa aplikasi (login, tab, foto) tetap jalan
-const {PDFDocument, PDFName, PDFNumber, PDFRawStream}=(window.PDFLib||{});
-
-let pdfBlob=null;       // Blob PDF hasil kompresi
-let namaHasilPdf='PDF_kompres.pdf';
-
-// Switch antara tab foto, PDF & Pengaturan
+/* ---------- Pindah tab: Stempel Geotag Foto <-> Kompres Ukuran ---------- */
 function switchTab(name){
-  // Bug #33: user role tidak bisa akses tab Pengaturan
-  if(name==='set' && sessionRole!=='admin') name='foto';
-  const foto=$('tabFoto'), pdf=$('tabPdf'), set=$('tabSet');
-  const btnFoto=$('tabBtnFoto'), btnPdf=$('tabBtnPdf'), btnSet=$('tabBtnSet');
-  if(!foto||!pdf) return;
-  // Hide semua tab
-  foto.style.display='none';
-  pdf.style.display='none';
-  if(set) set.style.display='none';
-  // Reset semua button state
-  btnFoto.classList.remove('active'); btnFoto.setAttribute('aria-selected','false');
-  btnPdf.classList.remove('active'); btnPdf.setAttribute('aria-selected','false');
-  if(btnSet){ btnSet.classList.remove('active'); btnSet.setAttribute('aria-selected','false'); }
-  // Tampilkan tab terpilih
-  if(name==='pdf'){
-    pdf.style.display='block';
-    btnPdf.classList.add('active'); btnPdf.setAttribute('aria-selected','true');
-  }else if(name==='set'){
-    if(set) set.style.display='block';
-    if(btnSet){ btnSet.classList.add('active'); btnSet.setAttribute('aria-selected','true'); }
-  }else{ // default: foto
-    foto.style.display='block';
-    btnFoto.classList.add('active'); btnFoto.setAttribute('aria-selected','true');
-  }
+  const foto=$('tabFoto'), kmp=$('tabKompres');
+  const btnFoto=$('tabBtnFoto'), btnKmp=$('tabBtnKompres');
+  if(!foto||!kmp) return;
+  const k=(name==='kompres');
+  foto.style.display=k?'none':'block';
+  kmp.style.display=k?'block':'none';
+  btnFoto.classList.toggle('active',!k); btnFoto.setAttribute('aria-selected',k?'false':'true');
+  btnKmp.classList.toggle('active',k);   btnKmp.setAttribute('aria-selected',k?'true':'false');
 }
+</script>
+<script>
+/* ===== Kompres Ukuran: (1) Gambar JPG/PNG/WebP  (2) File PDF — banyak file sekaligus =====
+   Ukuran hasil DIUKUR dari file sungguhan (bukan perkiraan), lalu disesuaikan sampai
+   mendekati target (≤ target, sedekat mungkin). */
+(()=>{
+'use strict';
+const q$=id=>document.getElementById(id);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const fmt=b=>b>=1048576?(b/1048576).toFixed(2)+' MB':Math.max(1,Math.round(b/1024))+' KB';
+const baseName=n=>(String(n||'file').replace(/\.[^.\\/]+$/,'')||'file');
+const toBlob=(cv,q)=>new Promise((res,rej)=>cv.toBlob(b=>b?res(b):rej(new Error('Browser gagal menyandikan gambar (memori habis?)')),'image/jpeg',q));
+const blobToDataURL=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(b);});
 
-// Bug #30: klik mana saja di kotak drop = langsung buka file picker (sebelumnya label+button
-// tidak memicu klik file input saat tombol diklik — user harus klik di luar tombol dulu).
-function pdfPickerClick(){
-  const inp=$('pdf');
-  inp.value='';          // reset supaya change event tetap fire saat user pilih file yg sama lagi
-  inp.click();           // langsung buka file picker di default folder device (browser-controlled)
+/* ---------- Inti: sandikan JPEG agar ukurannya ≤ budget (dan sedekat mungkin) ---------- */
+function gambarKe(src,sw,sh,w,h){
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const x=c.getContext('2d');
+  x.fillStyle='#fff'; x.fillRect(0,0,w,h);               // latar putih (PNG transparan)
+  x.imageSmoothingEnabled=true; if(x.imageSmoothingQuality!==undefined) x.imageSmoothingQuality='high';
+  x.drawImage(src,0,0,sw,sh,0,0,w,h);
+  return c;
 }
-
-// PDF: drag & drop handler
-(function(){
-  const drop=$('pdfDrop');
-  if(!drop) return;
-  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault();drop.classList.add('dragover');}));
-  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault();drop.classList.remove('dragover');}));
-  drop.addEventListener('drop', e=>{
-    const f=e.dataTransfer.files[0];
-    if(f && /\.pdf$/i.test(f.name)){ $('pdf').files=e.dataTransfer.files; pdfOnFilePicked(f); }
-  });
-})();
-
-// PDF: file input change
-$('pdf').addEventListener('change', e=>{
-  const f=e.target.files[0];
-  if(f) pdfOnFilePicked(f);
-});
-
-function pdfOnFilePicked(file){
-  const picked=$('pdfPicked');
-  picked.textContent='📄 '+file.name+' — '+(file.size/1024/1024).toFixed(2)+' MB';
-  picked.style.display='block';
-  $('pdfGo').disabled=false;
-  $('pdfSt').textContent='File dipilih. Klik "Kompres PDF" untuk mulai.';
-  $('pdfResult').style.display='none';
-  $('pdfDownload').style.display='none';
-  $('pdfBar').style.display='none';
-}
-
-function pdfSetBar(pct){
-  const bar=$('pdfBar'); bar.style.display='block';
-  bar.querySelector('div').style.width=Math.min(100,Math.max(0,pct))+'%';
-}
-
-// PDF: decode Uint8Array JPEG -> HTMLImageElement (via blob URL)
-function pdfDecodeJpeg(bytes){
-  return new Promise((res,rej)=>{
-    const blob=new Blob([bytes], {type:'image/jpeg'});
-    const url=URL.createObjectURL(blob);
-    const im=new Image();
-    im.onload=()=>{URL.revokeObjectURL(url);res(im);};
-    im.onerror=(e)=>{URL.revokeObjectURL(url);rej(e);};
-    im.src=url;
-  });
-}
-
-// PDF: re-encode image -> {dataUrl,size,w,h} pada kualitas+skala (TANPA apply — utk binary search)
-function pdfEncodeUkur(img, q, skala){
-  const w=Math.max(1,Math.round(img.naturalWidth*skala));
-  const h=Math.max(1,Math.round(img.naturalHeight*skala));
-  const cvx=document.createElement('canvas');
-  cvx.width=w; cvx.height=h;
-  const ctx=cvx.getContext('2d');
-  ctx.imageSmoothingEnabled=true;
-  if(ctx.imageSmoothingQuality!==undefined) ctx.imageSmoothingQuality='high';
-  ctx.drawImage(img,0,0,w,h);
-  const d=cvx.toDataURL('image/jpeg',q);
-  return {dataUrl:d, size:ukuranBytes(d), w, h};   // reuse ukuranBytes() global
-}
-
-// PDF: apply rekompresi ke PDF (mutasi obj.dict + obj.contents)
-function pdfApplyRecompress(decoded, q, skala){
-  for(const d of decoded){
-    if(!d) continue;
-    const r=pdfEncodeUkur(d.source, q, skala);
-    const newBytes=Uint8Array.from(atob(r.dataUrl.split(',')[1]), c=>c.charCodeAt(0));
-    d.obj.contents=newBytes;
-    d.dict.set(PDFName.of('Width'), PDFNumber.of(r.w));
-    d.dict.set(PDFName.of('Height'), PDFNumber.of(r.h));
-    d.dict.set(PDFName.of('Length'), PDFNumber.of(newBytes.length));
-  }
-}
-
-// Bug #31: Pad PDF bytes supaya ukuran file PERSIS = targetBytes.
-// Pakai PDF comment (mulai dgn %, akhir newline) — ditaruh SETELAH %%EOF.
-// Spec PDF mengizinkan konten tambahan setelah %%EOF; mayoritas PDF reader tetap validasi file.
-// Pendekatan ini dijamin byte-exact tanpa harus save PDF ulang (cepat & deterministik).
-function padToExactSize(pdfBytes, targetBytes){
-  if(pdfBytes.length>=targetBytes) return pdfBytes;   // sudah >= target, tidak bisa pad
-  const deficit=targetBytes-pdfBytes.length;
-  if(deficit<=0) return pdfBytes;
-  // Bangun byte padding langsung (Uint8Array) — efisien bahkan utk deficit besar
-  const padBytes=new Uint8Array(deficit);
-  if(deficit>=3){
-    // Format: \n % X*(deficit-3) \n = total deficit byte
-    padBytes[0]=0x0a;        // \n
-    padBytes[1]=0x25;        // %
-    for(let i=2;i<deficit-1;i++) padBytes[i]=0x58;   // 'X'
-    padBytes[deficit-1]=0x0a;  // \n
-  }else if(deficit===2){
-    padBytes[0]=0x0a; padBytes[1]=0x0a;   // dua newline
-  }else{ // deficit === 1
-    padBytes[0]=0x0a;                       // satu newline
-  }
-  const result=new Uint8Array(pdfBytes.length+deficit);
-  result.set(pdfBytes, 0);
-  result.set(padBytes, pdfBytes.length);
-  return result;
-}
-
-// PDF: estimasi total byte JPEG bila direkompres pada q+skala
-function pdfUkurTotal(decoded, q, skala){
-  let total=0;
-  for(const d of decoded){ if(!d) continue; total+=pdfEncodeUkur(d.source,q,skala).size; }
-  return total;
-}
-
-// PDF: fungsi utama — kompres PDF ke target ukuran
-async function kompresPDF(){
-  const file=$('pdf').files[0];
-  if(!file){ $('pdfSt').textContent='Pilih PDF dulu.'; return; }
-  if(!window.PDFLib){ $('pdfSt').textContent='⚠️ Library PDF gagal dimuat (cek koneksi internet), lalu muat ulang halaman.'; return; }
-  const go=$('pdfGo'); go.disabled=true;
-  $('pdfDownload').style.display='none';
-  $('pdfResult').style.display='none';
-  $('pdfSt').textContent='⏳ Membaca PDF...';
-  pdfSetBar(5);
-  try{
-    const targetVal=parseFloat($('pdfTarget').value);
-    const unit=$('pdfUnit').value;
-    const targetBytes = unit==='MB' ? targetVal*1024*1024 : targetVal*1024;
-    if(!isFinite(targetBytes) || targetBytes<1024){
-      $('pdfSt').textContent='Target tidak valid (min 1 KB).';
-      go.disabled=false; return;
+const SKALA=[1,.9,.8,.7,.6,.5,.42,.35,.3,.25,.2,.16,.13,.1];
+async function fitJpeg(src,sw,sh,budget,opt){
+  opt=opt||{};
+  const minPct=Math.round((opt.minQ||0.5)*100), maxPct=95, lowPct=15;
+  let kecil=null;                                          // hasil terkecil (cadangan bila target mustahil)
+  const catat=r=>{ if(!kecil||r.blob.size<kecil.blob.size) kecil=r; };
+  for(let i=0;i<SKALA.length;i++){
+    if(opt.batal&&opt.batal()) throw new Error('Dibatalkan');
+    const s=SKALA[i];
+    const w=Math.max(1,Math.round(sw*s)), h=Math.max(1,Math.round(sh*s));
+    if(i>0&&Math.min(w,h)<40) break;
+    const nx=SKALA[i+1];
+    const last=(nx===undefined)||Math.min(Math.round(sw*nx),Math.round(sh*nx))<40;
+    const floorPct=last?lowPct:minPct;
+    const cvs=gambarKe(src,sw,sh,w,h);
+    // 1) kualitas tertinggi — kalau sudah muat, selesai
+    let b=await toBlob(cvs,maxPct/100), r={blob:b,q:maxPct/100,w,h,s};
+    catat(r);
+    if(b.size<=budget) return Object.assign(r,{ok:true});
+    // 2) kualitas terendah yang diizinkan di skala ini
+    b=await toBlob(cvs,floorPct/100); r={blob:b,q:floorPct/100,w,h,s}; catat(r);
+    if(b.size>budget){
+      if(last) break;
+      // lompat ke skala yang diperkirakan cukup (ukuran ≈ sebanding jumlah piksel)
+      const perlu=s*Math.sqrt(budget/b.size)*1.1;
+      while(i+1<SKALA.length-1&&SKALA[i+1]>perlu) i++;
+      continue;
     }
+    // 3) cari kualitas (persen bulat) tertinggi yang masih ≤ budget
+    let lo=floorPct, hi=maxPct, best=r;
+    while(hi-lo>1){
+      const mid=(lo+hi)>>1, bm=await toBlob(cvs,mid/100);
+      if(bm.size<=budget){ lo=mid; best={blob:bm,q:mid/100,w,h,s}; } else hi=mid;
+    }
+    // 4) haluskan: kualitas +1 langkah sambil mengecilkan dimensi sedikit → ukuran makin dekat target
+    if(best.blob.size<budget*0.97&&lo<maxPct){
+      const q2=(lo+1)/100; let fl=0.8, fh=1.0;
+      for(let k=0;k<6;k++){
+        const f=(fl+fh)/2, w2=Math.max(1,Math.round(w*f)), h2=Math.max(1,Math.round(h*f));
+        const b2=await toBlob(gambarKe(src,sw,sh,w2,h2),q2);
+        if(b2.size<=budget){ fl=f; if(b2.size>best.blob.size) best={blob:b2,q:q2,w:w2,h:h2,s:s*f}; }
+        else fh=f;
+      }
+    }
+    return Object.assign(best,{ok:true});
+  }
+  return Object.assign(kecil,{ok:false});                  // target mustahil: kembalikan yang terkecil
+}
 
-    // 1. Load PDF dgn pdf-lib
-    const buf=await file.arrayBuffer();
-    pdfSetBar(15);
-    const pdfDoc=await PDFDocument.load(buf, {updateMetadata:false});
+async function bukaBitmap(blob,tanpaRotasi){
+  if(window.createImageBitmap){
+    if(tanpaRotasi){ try{ return await createImageBitmap(blob,{imageOrientation:'none'}); }catch(e){} }
+    try{ return await createImageBitmap(blob); }catch(e){}
+  }
+  return await new Promise((res,rej)=>{
+    const u=URL.createObjectURL(blob), im=new Image();
+    im.onload=()=>{URL.revokeObjectURL(u);res(im);}; im.onerror=()=>{URL.revokeObjectURL(u);rej(new Error('Gambar tidak bisa dibuka'));};
+    im.src=u;
+  });
+}
 
-    // 2. Cari semua JPEG image stream di PDF
-    $('pdfSt').textContent='⏳ Mencari gambar JPEG di PDF...';
-    pdfSetBar(25);
-    const decoded=[];
-    let iter;
-    try{ iter=pdfDoc.context.enumerate(); }
-    catch(e){ iter=[]; }
-    let nImg=0;
-    for(const [ref,obj] of iter){
-      if(obj instanceof PDFRawStream){
-        const dict=obj.dict;
-        const subtype=dict.get(PDFName.of('Subtype'));
-        if(!subtype || subtype.toString()!=='/Image') continue;
-        const filter=dict.get(PDFName.of('Filter'));
-        if(!filter || !filter.toString().includes('DCTDecode')) continue;
-        nImg++;
+/* =================== KOMPRES GAMBAR =================== */
+async function bacaExifObj(file){
+  try{ const o=piexif.load(await blobToDataURL(file)); const n=Object.keys(o['0th']||{}).length+Object.keys(o.Exif||{}).length+Object.keys(o.GPS||{}).length; return n?o:null; }
+  catch(e){ return null; }
+}
+async function kompresGambar(file,target,opt,upd,batal){
+  if(file.size<=target) return {blob:file,status:'same',nama:file.name,info:`Sudah di bawah target (${fmt(file.size)} ≤ ${fmt(target)}) — tidak diubah.`};
+  const tipe=(file.type||'').toLowerCase(), nm=(file.name||'').toLowerCase();
+  if(/heic|heif/.test(tipe)||/\.(heic|heif)$/.test(nm)) throw new Error('Format HEIC/HEIF tidak didukung browser. Ubah ke JPG dulu.');
+  upd('Membuka gambar…');
+  const bmp=await bukaBitmap(file,false);
+  const sw=bmp.naturalWidth||bmp.width, sh=bmp.naturalHeight||bmp.height;
+  const isJpeg=/jpe?g/.test(tipe)||/\.jpe?g$/.test(nm);
+  let exifObj=null, exifLen=0;
+  if(opt.keepExif&&isJpeg&&window.piexif){
+    exifObj=await bacaExifObj(file);
+    if(exifObj){
+      exifObj.thumbnail=null; delete exifObj['1st'];
+      exifObj['0th'][piexif.ImageIFD.Orientation]=1;        // bitmap sudah ditegakkan
+      try{ exifLen=piexif.dump(exifObj).length+8; }catch(e){ exifObj=null; exifLen=0; }
+    }
+  }
+  let budget=Math.max(2048,target-exifLen-64), hasil=null, final=null;
+  for(let pass=1;pass<=3;pass++){
+    upd(`Mencari kualitas terbaik (percobaan ${pass})…`);
+    hasil=await fitJpeg(bmp,sw,sh,budget,{minQ:0.5,batal});
+    let blob=hasil.blob;
+    if(exifObj){
+      try{
+        exifObj.Exif[piexif.ExifIFD.PixelXDimension]=hasil.w; exifObj.Exif[piexif.ExifIFD.PixelYDimension]=hasil.h;
+        const ins=piexif.insert(piexif.dump(exifObj),await blobToDataURL(blob));
+        const bin=atob(ins.split(',')[1]), a=new Uint8Array(bin.length);
+        for(let i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i);
+        blob=new Blob([a],{type:'image/jpeg'});
+      }catch(e){ exifObj=null; blob=hasil.blob; }
+    }
+    final=blob;                                              // ukuran NYATA file yang akan diunduh
+    if(final.size<=target||!hasil.ok) break;
+    budget-= (final.size-target)+512;                        // masih kelebihan → ketatkan
+  }
+  if(bmp.close) try{bmp.close();}catch(e){}
+  const dim=`${hasil.w}×${hasil.h}px`, pers=Math.round(final.size/target*100);
+  const tail=` · ${dim} · kualitas ${Math.round(hasil.q*100)}%`+(exifObj?' · EXIF/GPS dipertahankan':(opt.keepExif&&isJpeg?' · (tanpa EXIF)':''));
+  const nama=baseName(file.name)+'_kompres.jpg';
+  if(final.size<=target) return {blob:final,status:'ok',nama,info:`Hasil ${fmt(final.size)} ≤ target ${fmt(target)} (${pers}%)${tail}`};
+  return {blob:final,status:'warn',nama,info:`Belum tercapai: hasil terkecil ${fmt(final.size)}, target ${fmt(target)}. Naikkan target sedikit.${tail}`};
+}
+
+/* =================== KOMPRES PDF =================== */
+let _pdfjsMuat=null;
+function muatPdfJs(){
+  if(window.pdfjsLib) return Promise.resolve();
+  if(_pdfjsMuat) return _pdfjsMuat;
+  const base='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+  _pdfjsMuat=new Promise((res,rej)=>{
+    const s=document.createElement('script'); s.src=base+'pdf.min.js';
+    s.onload=()=>{ window.pdfjsLib.GlobalWorkerOptions.workerSrc=base+'pdf.worker.min.js'; res(); };
+    s.onerror=()=>{ _pdfjsMuat=null; rej(new Error('Gagal memuat pdf.js (periksa internet)')); };
+    document.head.appendChild(s);
+  });
+  return _pdfjsMuat;
+}
+async function inflate(bytes){
+  if(typeof DecompressionStream==='undefined') throw new Error('Browser tidak mendukung DecompressionStream');
+  const s=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
+  return new Uint8Array(await new Response(s).arrayBuffer());
+}
+// Telusuri semua gambar di PDF: mana yang aman dikompres ulang
+function temukanGambar(doc){
+  const {PDFName,PDFRawStream,PDFArray,PDFRef,PDFDict,PDFBool}=PDFLib;
+  const ctx=doc.context, N=n=>PDFName.of(n);
+  const lk=v=>(v===undefined?undefined:ctx.lookup(v));
+  const num=v=>{const o=lk(v);return(o&&typeof o.asNumber==='function')?o.asNumber():NaN;};
+  const nm=v=>{const o=lk(v);return(o instanceof PDFName)?o.toString():null;};
+  const filters=d=>{const f=lk(d.get(N('Filter')));if(!f)return[];if(f instanceof PDFName)return[f.toString()];
+    if(f instanceof PDFArray){const o=[];for(let i=0;i<f.size();i++){const e=lk(f.get(i));o.push(e?e.toString():'?');}return o;}return['?'];};
+  const csInfo=v=>{const o=lk(v);
+    if(o instanceof PDFName){const s=o.toString();return(s==='/DeviceRGB'||s==='/CalRGB')?'rgb':(s==='/DeviceGray'||s==='/CalGray')?'gray':s==='/DeviceCMYK'?'cmyk':'other';}
+    if(o instanceof PDFArray&&o.size()>0){const h=lk(o.get(0)),hs=h?h.toString():'';
+      if(hs==='/ICCBased'){const st=lk(o.get(1));const n=(st&&st.dict)?num(st.dict.get(N('N'))):NaN;return n===3?'rgb':n===1?'gray':n===4?'cmyk':'other';}
+      if(hs==='/CalRGB')return'rgb'; if(hs==='/CalGray')return'gray'; if(hs==='/Indexed')return'indexed';}
+    return'other';};
+  const semua=[], pakaiSbgMask=new Set();
+  for(const [ref,obj] of ctx.enumerateIndirectObjects()){
+    if(!(obj instanceof PDFRawStream)) continue;
+    const d=obj.dict;
+    if(nm(d.get(N('Subtype')))!=='/Image') continue;
+    const sm=d.get(N('SMask')); if(sm instanceof PDFRef) pakaiSbgMask.add(sm.toString());
+    const mk=d.get(N('Mask')); if(mk instanceof PDFRef) pakaiSbgMask.add(mk.toString());
+    semua.push({ref,obj,d});
+  }
+  const kandidat=[]; let dilewati=0;
+  for(const g of semua){
+    const {ref,obj,d}=g;
+    const bytes=obj.getContents().length, w=num(d.get(N('Width'))), h=num(d.get(N('Height')));
+    const f=filters(d), cs=csInfo(d.get(N('ColorSpace')));
+    const im=lk(d.get(N('ImageMask'))); const stensil=(im instanceof PDFBool)&&im===PDFBool.True;
+    const mask=lk(d.get(N('Mask'))); const sm=lk(d.get(N('SMask')));
+    let aman=isFinite(w)&&isFinite(h)&&w>0&&h>0&&!stensil&&!pakaiSbgMask.has(ref.toString())&&!(mask instanceof PDFArray)
+             &&!(sm&&sm.dict&&sm.dict.has(N('Matte')))&&!d.has(N('Decode'));
+    let jenis=null;
+    if(aman&&f.length===1&&f[0]==='/DCTDecode'&&(cs==='rgb'||cs==='gray')) jenis='dct';
+    else if(aman&&f.length===1&&f[0]==='/FlateDecode'&&(cs==='rgb'||cs==='gray')&&num(d.get(N('BitsPerComponent')))===8) jenis='flate';
+    if(!jenis||bytes<8192){ if(!jenis&&aman===false) dilewati++; else if(!jenis) dilewati++; continue; }
+    kandidat.push({ref,obj,d,jenis,cs,w,h,bytes,lk,num,N});
+  }
+  return {kandidat,jumlah:semua.length,dilewati};
+}
+// Flate (piksel mentah) → canvas RGBA
+async function dekodeFlate(c){
+  const {PDFDict,PDFArray}=PDFLib;
+  const raw=await inflate(c.obj.getContents());
+  const colors=c.cs==='rgb'?3:1, W=c.w, H=c.h;
+  let dp=c.lk(c.d.get(c.N('DecodeParms'))); if(dp instanceof PDFArray) dp=dp.size()?c.lk(dp.get(0)):null;
+  let pred=1; if(dp instanceof PDFDict){ pred=c.num(dp.get(c.N('Predictor')))||1; }
+  let data;
+  if(pred>=10){
+    const rowLen=colors*W, stride=rowLen+1;
+    if(raw.length<stride*H) throw new Error('data gambar tidak lengkap');
+    data=new Uint8Array(rowLen*H);
+    for(let y=0;y<H;y++){
+      const ft=raw[y*stride], so=y*stride+1, dof=y*rowLen;
+      for(let x=0;x<rowLen;x++){
+        const a=x>=colors?data[dof+x-colors]:0, b=y>0?data[dof-rowLen+x]:0, cc=(x>=colors&&y>0)?data[dof-rowLen+x-colors]:0;
+        let v=raw[so+x];
+        if(ft===1)v+=a; else if(ft===2)v+=b; else if(ft===3)v+=(a+b)>>1;
+        else if(ft===4){const p=a+b-cc,pa=Math.abs(p-a),pb=Math.abs(p-b),pc=Math.abs(p-cc);v+=(pa<=pb&&pa<=pc)?a:(pb<=pc?b:cc);}
+        data[dof+x]=v&255;
+      }
+    }
+  }else if(pred===1){
+    if(raw.length<colors*W*H) throw new Error('data gambar tidak lengkap');
+    data=raw;
+  }else throw new Error('predictor tidak didukung');
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const x=cv.getContext('2d'), id=x.createImageData(W,H), px=id.data;
+  if(colors===3){ for(let i=0,j=0;i<W*H;i++){px[j++]=data[i*3];px[j++]=data[i*3+1];px[j++]=data[i*3+2];px[j++]=255;} }
+  else{ for(let i=0,j=0;i<W*H;i++){const g=data[i];px[j++]=g;px[j++]=g;px[j++]=g;px[j++]=255;} }
+  x.putImageData(id,0,0);
+  return cv;
+}
+async function terapkanGambar(c,res){
+  const {PDFName,PDFNumber}=PDFLib, N=n=>PDFName.of(n), d=c.d;
+  const bytes=new Uint8Array(await res.blob.arrayBuffer());
+  c.obj.contents=bytes;
+  d.set(N('Filter'),N('DCTDecode'));
+  d.delete(N('DecodeParms')); d.delete(N('Decode'));
+  d.set(N('ColorSpace'),N('DeviceRGB'));
+  d.set(N('BitsPerComponent'),PDFNumber.of(8));
+  d.set(N('Width'),PDFNumber.of(res.w)); d.set(N('Height'),PDFNumber.of(res.h));
+  d.set(N('Length'),PDFNumber.of(bytes.length));
+}
+
+// TAHAP A: kompres ulang gambar tertanam (teks & struktur halaman tetap utuh)
+async function pdfTahapA(buf,origSize,target,upd,batal){
+  const {PDFDocument}=PDFLib;
+  async function satuPass(B){
+    const doc=await PDFDocument.load(new Uint8Array(buf),{updateMetadata:false});
+    const {kandidat,jumlah,dilewati}=temukanGambar(doc);
+    const sumC=kandidat.reduce((s,c)=>s+c.bytes,0);
+    let remB=Math.max(B,sumC*0.02), remO=sumC, diubah=0, gagal=0, jenuh=true, adaBatas=false;
+    for(let i=0;i<kandidat.length;i++){
+      if(batal()) throw new Error('Dibatalkan');
+      const c=kandidat[i];
+      upd(`Gambar ${i+1}/${kandidat.length}…`); await sleep(0);
+      const bi=Math.max(2048,remB*c.bytes/remO);
+      let pakai=c.bytes;
+      if(c.bytes>bi){
+        adaBatas=true;
         try{
-          const im=await pdfDecodeJpeg(obj.getContents());
-          decoded.push({obj,dict,source:im});
-        }catch(e){ decoded.push(null); }
+          let sumber, tutup=null;
+          if(c.jenis==='dct'){
+            sumber=await bukaBitmap(new Blob([c.obj.getContents()],{type:'image/jpeg'}),true); tutup=sumber;
+            const sw=sumber.naturalWidth||sumber.width, sh=sumber.naturalHeight||sumber.height;
+            if(sw!==c.w||sh!==c.h) throw new Error('dimensi tidak cocok (rotasi EXIF)');
+          }else sumber=await dekodeFlate(c);
+          const res=await fitJpeg(sumber,c.w,c.h,bi,{minQ:0.45,batal});
+          if(tutup&&tutup.close) try{tutup.close();}catch(e){}
+          if(res.blob.size<c.bytes){ await terapkanGambar(c,res); pakai=res.blob.size; diubah++; if(!(res.q>=0.95&&res.s===1)) jenuh=false; }
+        }catch(e){ if(e.message==='Dibatalkan') throw e; gagal++; }
       }
+      remB-=pakai; remO-=c.bytes;
     }
-    pdfSetBar(45);
-
-    if(nImg===0){
-      // Tidak ada JPEG tertanam — save ulang dgn kompresi struktur saja
-      $('pdfSt').textContent='ℹ️ PDF tanpa JPEG tertanam. Save ulang dgn kompresi struktur...';
-      const pdfBytes=await pdfDoc.save({useObjectStreams:true, addDefaultPage:false});
-      pdfBlob=new Blob([pdfBytes], {type:'application/pdf'});
-      pdfShowResult(file, pdfBlob, 0, 'n/a', 1, 'n/a (tidak ada JPEG utk direkompres)');
-      return;
-    }
-
-    // 3. Binary search utk capai target. Auto-fallback skala 1.0 -> 0.75 -> 0.5
-    $('pdfSt').textContent=`⏳ ${nImg} gambar ditemukan. Mencari kualitas terbaik utk capai target...`;
-    pdfSetBar(55);
-    const skalaCoba=[1.0, 0.75, 0.5];
-    let best=null;
-    for(const s of skalaCoba){
-      const sizeHi=pdfUkurTotal(decoded, 0.95, s);
-      if(sizeHi<=targetBytes){ best={q:0.95, skala:s, size:sizeHi}; break; }
-      let lo=0.3, hi=0.95;
-      let localBest={q:0.3, skala:s, size:pdfUkurTotal(decoded, 0.3, s)};
-      for(let i=0;i<7;i++){
-        const mid=(lo+hi)/2;
-        const sz=pdfUkurTotal(decoded, mid, s);
-        if(sz<=targetBytes){ lo=mid; localBest={q:mid,skala:s,size:sz}; }
-        else hi=mid;
-      }
-      if(localBest.size<=targetBytes){ best=localBest; break; }
-      if(!best || localBest.size<best.size) best=localBest;
-    }
-    pdfSetBar(70);
-
-    // 4. Apply rekompresi ke PDF
-    $('pdfSt').textContent=`⏳ Menerapkan rekompresi (q=${best.q.toFixed(2)}, skala=${best.skala})...`;
-    pdfApplyRecompress(decoded, best.q, best.skala);
-    pdfSetBar(85);
-
-    // 5. Save PDF baru dgn useObjectStreams
-    $('pdfSt').textContent='⏳ Menyimpan PDF baru...';
-    const pdfBytes=await pdfDoc.save({useObjectStreams:true, addDefaultPage:false});
-    // Bug #31: pad hasil supaya ukuran file PERSIS = targetBytes (sesuai pilihan user, jangan dirubah)
-    const finalBytes=padToExactSize(pdfBytes, targetBytes);
-    pdfBlob=new Blob([finalBytes], {type:'application/pdf'});
-    pdfSetBar(100);
-
-    const base=(file.name||'dokumen.pdf').replace(/\.pdf$/i,'');
-    namaHasilPdf=`${base}_kompres.pdf`;
-    // Status target: cek apakah hasil persis = target, kurang, atau kelebihan
-    let statusText;
-    if(finalBytes.length===targetBytes){
-      statusText='Tercapai PERSIS — file = '+targetBytes+' byte (sesuai pilihan)';
-    }else if(finalBytes.length<targetBytes){
-      statusText=`Tercapai (kurang ${targetBytes-finalBytes.length} byte — terlalu kecil utk padding)`;
-    }else{
-      statusText=`Belum tercapai (best effort — kelebihan ${finalBytes.length-targetBytes} byte, sudah kompres maksimal)`;
-    }
-    pdfShowResult(file, pdfBlob, nImg, best.q, best.skala, statusText);
-  }catch(err){
-    console.error('Gagal kompres PDF:',err);
-    $('pdfSt').textContent='⚠️ Gagal: '+err.message;
-  }finally{
-    go.disabled=false;
+    upd('Menyimpan PDF…'); await sleep(0);
+    const bytes=await doc.save({useObjectStreams:true,addDefaultPage:false});
+    return {bytes,size:bytes.length,jumlah,kandidat:kandidat.length,diubah,gagal,dilewati,sumC,jenuh:jenuh||!adaBatas,adaBatas};
   }
-}
-
-function pdfShowResult(file, blob, nImg, q, skala, statusText){
-  const origKB=Math.round(file.size/1024);
-  const newKB=Math.round(blob.size/1024);
-  const rasio=origKB>0?Math.round((1-newKB/origKB)*100):0;
-  const rasioStr=rasio>=0?`-${rasio}%`:`+${-rasio}%`;
-  $('pdfSt').textContent=`✅ Selesai. ${origKB} KB → ${newKB} KB (${rasioStr}).`;
-  const el=$('pdfResult'); el.style.display='block';
-  el.textContent=
-    `── HASIL KOMPRESI PDF ──\n`+
-    `📄 Gambar direkompres : ${nImg} JPEG\n`+
-    `🎨 Kualitas akhir      : q=${typeof q==='number'?q.toFixed(2):q}\n`+
-    `📐 Skala dimensi       : ${skala}×\n`+
-    `💾 Ukuran asli         : ${origKB} KB (${(file.size/1024/1024).toFixed(2)} MB)\n`+
-    `💾 Ukuran hasil        : ${newKB} KB (${(blob.size/1024/1024).toFixed(2)} MB)\n`+
-    `📊 Perubahan           : ${rasioStr}\n`+
-    `🎯 Status target       : ${statusText}`;
-  $('pdfDownload').style.display='block';
-}
-
-// PDF: unduh hasil
-function unduhPDF(){
-  if(!pdfBlob){ $('pdfSt').textContent='Kompres dulu sebelum unduh.'; return; }
-  const u=URL.createObjectURL(pdfBlob);
-  const a=document.createElement('a');
-  a.download=namaHasilPdf; a.href=u;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(u),15000);
-  $('pdfSt').textContent='✅ PDF diunduh: '+namaHasilPdf;
-}
-
-/* ---------- Bug #36: Password admin SEKALI BUAT + Kode Akses dari admin ----------
-   - Password admin dibuat SEKALI oleh admin DI DASHBOARD (tab Pengaturan), hanya dari file
-     lokal (file:// atau localhost). Belum ada password => file lokal terbuka sbg admin.
-     Di situs yang sudah di-host tanpa password, aplikasi diblokir ("belum aktif"), jadi
-     orang lain tidak bisa membuat password sendiri. Tidak ada layar buat-password di login.
-   - Tidak ada lagi "password user" bersama. Admin membuat KODE AKSES per orang
-     (mis. ABCD-EFGH-JKLM-NPQR). Kode tampil SEKALI saat dibuat, lalu dikirim admin ke orangnya.
-   - Hanya admin (password) atau pemegang kode yang bisa masuk. Kode user tidak bisa ganti
-     password dan tidak bisa membuka tab Pengaturan.
-   - Kode bisa dicabut admin kapan saja. Di versi distribusi, pencabutan berlaku setelah
-     admin generate ulang index.html dan upload ulang.
-   - Keamanan: PBKDF2 100k + AES-GCM, salt acak, lockout bertingkat, timeout sesi 30 menit.
-   CATATAN JUJUR: ini aplikasi statis tanpa server. Pembatasan bersifat sisi-klien; file
-   distribusi memuat token terenkripsi, jadi kekuatan akses ada pada kekuatan password admin
-   dan kode (kode 16 karakter ≈ 59 bit entropi acak bagian rahasia). ---------- */
-const ADMIN_KEY='appAdminToken_v1';    // base64 IV+encrypted token utk admin (localStorage mode)
-const CODES_KEY='appAccessCodes_v1';   // JSON daftar kode akses (localStorage mode)
-const OLD_USER_KEY='appUserToken_v1';  // password user versi lama — dibersihkan
-const SALT_KEY='appSalt_v1';           // base64 random salt (localStorage mode)
-const FAIL_KEY='appFailCount_v1';     // jumlah upaya gagal
-const LOCK_KEY='appLockUntil_v1';     // timestamp kunci sampe
-const ACT_KEY='appLastActivity_v1';   // timestamp aktivitas terakhir
-const PBKDF2_ITER=100000;               // iterasi (100k = ~100ms per attempt di browser modern)
-const LOCKOUT_TIMES=[30000,60000,300000,900000,3600000];   // 30s, 1m, 5m, 15m, 1h
-const SESSION_TIMEOUT=30*60*1000;      // 30 menit
-const MIN_PASSWORD_LEN=8;
-const CODE_ALPHABET='ABCDEFGHJKMNPQRSTUVWXYZ23456789';   // 31 karakter, tanpa I/L/O/0/1 (mudah salah baca)
-const CODE_LEN=16;                      // 4 karakter ID + 12 karakter rahasia
-const CODE_ID_LEN=4;
-
-// Embedded data — diisi oleh generatePublishedVersion() saat admin generate file distribusi.
-// Di mode dev (file asli), ini kosong — app pakai localStorage. Di mode published (file distribusi),
-// ini terisi. PUBLISHED_MODE auto-detek dari sini.
-const EMBEDDED_SALT='blQM/tK3P2vbTADB9n+jkQ==';
-const EMBEDDED_ADMIN_TOKEN='058gcfOVrb2noP/WndQxwTms+y8cIKISkCSpOh5rmLWoDMtqLCrctB67K3Ke5gKqLHfllYNtVBQ1ULNB';
-const EMBEDDED_CODES='';
-const PUBLISHED_MODE=!!(EMBEDDED_SALT && EMBEDDED_ADMIN_TOKEN);
-
-let loginBusy=false;
-
-// Setup password admin hanya boleh dari file lokal / localhost — bukan dari situs yang di-host
-function isLocalContext(){
-  const h=location.hostname;
-  return location.protocol==='file:' || h==='localhost' || h==='127.0.0.1' || h==='[::1]' || h==='::1';
-}
-
-// --- util base64 <-> Uint8Array ---
-function toB64(bytes){ return btoa(String.fromCharCode.apply(null, bytes)); }
-function fromB64(str){
-  const bin=atob(str); const bytes=new Uint8Array(bin.length);
-  for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
-  return bytes;
-}
-
-// --- Random bytes (salt 16 byte, token 32 byte, IV 12 byte AES-GCM) ---
-function randomBytes(n){ const a=new Uint8Array(n); crypto.getRandomValues(a); return a; }
-
-// --- Karakter acak dari CODE_ALPHABET (rejection sampling, tanpa modulo bias) ---
-function randomChars(n){
-  const lim=256-(256%CODE_ALPHABET.length);
-  let out='';
-  while(out.length<n){
-    const buf=randomBytes(n*2);
-    for(let i=0;i<buf.length&&out.length<n;i++){
-      if(buf[i]<lim) out+=CODE_ALPHABET[buf[i]%CODE_ALPHABET.length];
-    }
+  // perkiraan awal: sisa isi PDF (selain gambar kandidat) tetap, gambar dibagi sisa anggaran
+  const doc0=await PDFDocument.load(new Uint8Array(buf),{updateMetadata:false});
+  const info0=temukanGambar(doc0);
+  let B=target-(origSize-info0.kandidat.reduce((s,c)=>s+c.bytes,0))-1024;
+  let terbaik=null;
+  for(let pass=1;pass<=4;pass++){
+    upd(`Kompres gambar — putaran ${pass}…`);
+    const r=await satuPass(B); r.pass=pass;
+    const muat=r.size<=target;
+    if(!terbaik||(muat&&(terbaik.size>target||r.size>terbaik.size))||(!muat&&terbaik.size>target&&r.size<terbaik.size)) terbaik=r;
+    if(muat&&r.size>=target*0.95) break;
+    if(r.kandidat===0||(!r.adaBatas&&muat)||(r.jenuh&&muat)) break;   // tidak ada yang bisa dilonggarkan
+    B=B+(target-r.size)*(muat?0.97:1.04);
+    if(B<=0) break;
   }
-  return out;
-}
-function formatCode(full){ return full.match(/.{1,4}/g).join('-'); }
-function normCode(s){ return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
-
-// --- PBKDF2 key derivation: password + salt → AES-GCM 256-bit key ---
-async function deriveKEK(password, saltBytes){
-  const keyMaterial=await crypto.subtle.importKey(
-    'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']
-  );
-  return crypto.subtle.deriveKey(
-    {name:'PBKDF2', salt:saltBytes, iterations:PBKDF2_ITER, hash:'SHA-256'},
-    keyMaterial,
-    {name:'AES-GCM', length:256},
-    false,
-    ['encrypt','decrypt']
-  );
+  return terbaik;
 }
 
-// --- AES-GCM encrypt: return IV(12) + ciphertext + authTag ---
-async function encryptToken(kek, tokenBytes){
-  const iv=randomBytes(12);
-  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM', iv}, kek, tokenBytes));
-  const combined=new Uint8Array(iv.length+ct.length);
-  combined.set(iv,0); combined.set(ct,iv.length);
-  return combined;
-}
-// --- AES-GCM decrypt: parse IV + ciphertext, return plaintext (or throw jika auth gagal = password salah) ---
-async function decryptToken(kek, combined){
-  const iv=combined.slice(0,12);
-  const ct=combined.slice(12);
-  return crypto.subtle.decrypt({name:'AES-GCM', iv}, kek, ct);
-}
-
-// --- Salt getter (prefer embedded, fall back to localStorage) ---
-function getSalt(){
-  if(EMBEDDED_SALT) return fromB64(EMBEDDED_SALT);
-  let s=localStorage.getItem(SALT_KEY);
-  if(s) return fromB64(s);
-  const salt=randomBytes(16);
-  localStorage.setItem(SALT_KEY, toB64(salt));
-  return salt;
-}
-
-// --- Daftar kode akses (embedded di mode published, localStorage di mode dev) ---
-function getCodes(){
+// TAHAP B: ubah halaman jadi gambar JPEG (teks tak bisa diseleksi) — menjamin target tercapai
+async function pdfTahapB(buf,target,upd,batal){
+  await muatPdfJs();
+  const {PDFDocument}=PDFLib;
+  const pdf=await window.pdfjsLib.getDocument({data:new Uint8Array(buf.slice(0))}).promise;
+  const n=pdf.numPages, ukuran=[];
+  for(let i=1;i<=n;i++){ const p=await pdf.getPage(i); const v=p.getViewport({scale:1}); ukuran.push({w:v.width,h:v.height}); p.cleanup(); }
+  const MAXPX=2000;
+  async function satuPass(budgetTotal){
+    const out=await PDFDocument.create();
+    let rem=budgetTotal-1500-n*350, remArea=ukuran.reduce((s,u)=>s+u.w*u.h,0), jenuh=true;
+    for(let i=1;i<=n;i++){
+      if(batal()) throw new Error('Dibatalkan');
+      upd(`Halaman ${i}/${n}…`); await sleep(0);
+      const page=await pdf.getPage(i), u=ukuran[i-1];
+      const sc=Math.min(4,MAXPX/Math.max(u.w,u.h)), vp=page.getViewport({scale:sc});
+      const cvs=document.createElement('canvas'); cvs.width=Math.ceil(vp.width); cvs.height=Math.ceil(vp.height);
+      const cx=cvs.getContext('2d'); cx.fillStyle='#fff'; cx.fillRect(0,0,cvs.width,cvs.height);
+      await page.render({canvasContext:cx,viewport:vp}).promise; page.cleanup();
+      const bi=Math.max(1500,rem*(u.w*u.h)/remArea);
+      const res=await fitJpeg(cvs,cvs.width,cvs.height,bi,{minQ:0.45,batal});
+      if(!(res.q>=0.95&&res.s===1)) jenuh=false;
+      const img=await out.embedJpg(new Uint8Array(await res.blob.arrayBuffer()));
+      const pg=out.addPage([u.w,u.h]); pg.drawImage(img,{x:0,y:0,width:u.w,height:u.h});
+      rem-=res.blob.size; remArea-=u.w*u.h;
+      cvs.width=cvs.height=0;
+    }
+    const bytes=await out.save({useObjectStreams:true});
+    return {bytes,size:bytes.length,jenuh};
+  }
+  let budget=target*0.97, terbaik=null;
   try{
-    if(PUBLISHED_MODE){
-      if(!EMBEDDED_CODES) return [];
-      const arr=JSON.parse(new TextDecoder().decode(fromB64(EMBEDDED_CODES)));
-      return Array.isArray(arr)?arr:[];
+    for(let pass=1;pass<=3;pass++){
+      upd(`Mengubah halaman jadi gambar — putaran ${pass}…`);
+      const r=await satuPass(budget); r.pass=pass; r.halaman=n;
+      const muat=r.size<=target;
+      if(!terbaik||(muat&&(terbaik.size>target||r.size>terbaik.size))||(!muat&&terbaik.size>target&&r.size<terbaik.size)) terbaik=r;
+      if(muat&&r.size>=target*0.9) break;
+      if(muat&&r.jenuh) break;
+      budget=budget*(target/r.size)*0.97;
     }
-    const arr=JSON.parse(localStorage.getItem(CODES_KEY)||'[]');
-    return Array.isArray(arr)?arr:[];
-  }catch(e){ return []; }
-}
-function saveCodes(list){ localStorage.setItem(CODES_KEY, JSON.stringify(list)); }
-
-// --- Set password admin: generate random token, encrypt dgn KEK (mode dev only) ---
-async function setAdminPassword(p){
-  const kek=await deriveKEK(p, getSalt());
-  const token=randomBytes(32);
-  const enc=await encryptToken(kek, token);
-  localStorage.setItem(ADMIN_KEY, toB64(enc));
+  }finally{ try{ await pdf.destroy(); }catch(e){} }
+  return terbaik;
 }
 
-// --- Verify admin: prefer embedded token (published mode), fall back to localStorage ---
-async function verifyAdmin(p){
-  const stored=EMBEDDED_ADMIN_TOKEN || localStorage.getItem(ADMIN_KEY);
-  if(!stored) return false;
-  const kek=await deriveKEK(p, getSalt());
-  try{ await decryptToken(kek, fromB64(stored)); return true; }
-  catch(e){ return false; }
-}
-// --- Verify kode akses: 4 karakter pertama = ID entri, jadi cukup 1x PBKDF2 ---
-async function verifyCode(input){
-  const norm=normCode(input);
-  if(norm.length!==CODE_LEN) return false;
-  const entry=getCodes().find(e=>e&&e.id===norm.slice(0,CODE_ID_LEN));
-  if(!entry||!entry.token) return false;
-  const kek=await deriveKEK(norm, getSalt());
-  try{ await decryptToken(kek, fromB64(entry.token)); return true; }
-  catch(e){ return false; }
-}
-
-function isPasswordSet(){
-  if(PUBLISHED_MODE) return true;
-  return !!localStorage.getItem(ADMIN_KEY);
-}
-
-// --- Lockout: track failed attempts, exponential backoff ---
-function getLockStatus(){
-  const fails=parseInt(localStorage.getItem(FAIL_KEY)||'0',10);
-  const lockUntil=parseInt(localStorage.getItem(LOCK_KEY)||'0',10);
-  const now=Date.now();
-  if(lockUntil>now) return {locked:true, remaining:lockUntil-now, fails};
-  return {locked:false, fails};
-}
-function recordFailedAttempt(){
-  let fails=parseInt(localStorage.getItem(FAIL_KEY)||'0',10)+1;
-  localStorage.setItem(FAIL_KEY, String(fails));
-  if(fails>=5){
-    const idx=Math.min(LOCKOUT_TIMES.length-1, fails-5);
-    localStorage.setItem(LOCK_KEY, String(Date.now()+LOCKOUT_TIMES[idx]));
-  }
-  return fails;
-}
-function resetFails(){ localStorage.removeItem(FAIL_KEY); localStorage.removeItem(LOCK_KEY); }
-
-// --- Session timeout: track last activity ---
-function recordActivity(){
-  if(sessionRole!==null) localStorage.setItem(ACT_KEY, String(Date.now()));
-}
-function checkSessionTimeout(){
-  if(sessionRole===null) return;
-  const last=parseInt(localStorage.getItem(ACT_KEY)||'0',10);
-  if(last && Date.now()-last>SESSION_TIMEOUT){
-    lockApp();
-  }
-}
-
-// --- Login overlay. Mode: 'login' | 'blocked' ---
-function showLogin(mode){
-  const ov=$('loginOverlay'); if(!ov) return;
-  ov.style.display='flex';
-  let effMode=mode;
-  if(PUBLISHED_MODE) effMode='login';
-  $('loginMode').style.display = (effMode==='login') ? 'block' : 'none';
-  $('blockedMode').style.display = (effMode==='blocked') ? 'block' : 'none';
-  const lp=$('loginPass'); if(lp) lp.value='';
-  const le=$('loginErr'); if(le) le.textContent='';
-  const ls=$('loginShow'); if(ls) ls.checked=false;
-  if(lp) lp.type='password';
-  setTimeout(()=>{ try{ if(effMode==='login') $('loginPass').focus(); }catch(e){} }, 50);
-}
-function hideLogin(){ $('loginOverlay').style.display='none'; }
-
-function showTabNav(){
-  const btnSet=$('tabBtnSet');
-  if(btnSet){
-    // Versi distribusi: tab Pengaturan disembunyikan utk semua. Mode dev: hanya admin.
-    if(PUBLISHED_MODE){
-      btnSet.style.display='none';
-    }else{
-      btnSet.style.display = (sessionRole==='admin') ? 'inline-flex' : 'none';
-    }
-  }
-  if(sessionRole==='user' || (PUBLISHED_MODE && sessionRole!==null)) switchTab('foto');
-  if(sessionRole==='admin' && !PUBLISHED_MODE){ renderCodeList(); refreshSettingsState(); }
-}
-
-// --- Tampilkan kartu "Buat" (belum ada password) atau "Ganti" (sudah ada) di Pengaturan ---
-function refreshSettingsState(){
-  const has=isPasswordSet();
-  const c=$('createAdminSection'), g=$('changeAdminSection');
-  if(c) c.style.display = has ? 'none' : 'block';
-  if(g) g.style.display = has ? 'block' : 'none';
-}
-
-// --- BUAT password admin: SEKALI, oleh admin, dari dashboard (hanya file lokal) ---
-async function createAdminPassword(){
-  const msg=$('createMsg');
-  if(sessionRole!=='admin'){ msg.textContent='⚠️ Hanya admin yang bisa membuat password.'; return; }
-  if(PUBLISHED_MODE || isPasswordSet()){ msg.textContent='⚠️ Password admin sudah dibuat. Gunakan "Ganti Password Admin".'; refreshSettingsState(); return; }
-  if(!isLocalContext()){ msg.textContent='⚠️ Password hanya bisa dibuat dari file lokal.'; return; }
-  const neu=$('createAdminPass').value, conf=$('createAdminConfirm').value;
-  if(!neu||!conf){ msg.textContent='⚠️ Semua kolom wajib diisi.'; return; }
-  if(neu!==conf){ msg.textContent='⚠️ Konfirmasi tidak cocok.'; return; }
-  if(neu.length<MIN_PASSWORD_LEN){ msg.textContent='⚠️ Password minimal '+MIN_PASSWORD_LEN+' karakter.'; return; }
-  msg.textContent='⏳ Mengenkripsi (PBKDF2 100k iter)...';
-  await setAdminPassword(neu);
-  localStorage.removeItem(OLD_USER_KEY);
-  resetFails();
-  $('createAdminPass').value=''; $('createAdminConfirm').value='';
-  msg.textContent='✅ Password admin dibuat. Aplikasi sekarang terkunci — berikutnya masuk dgn password ini. Buat Kode Akses utk orang lain di bawah.';
-  recordActivity();
-  refreshSettingsState();
-}
-function toggleCreateShow(){
-  const s=$('createShow').checked;
-  ['createAdminPass','createAdminConfirm'].forEach(id=>{ const el=$(id); if(el) el.type=s?'text':'password'; });
-}
-
-// --- LOGIN: cek lockout dulu, lalu verify admin (password) atau user (kode akses) ---
-async function submitLogin(){
-  if(loginBusy) return;
-  const err=$('loginErr');
-  const lock=getLockStatus();
-  if(lock.locked){
-    const s=Math.ceil(lock.remaining/1000);
-    err.textContent='🔒 Terkunci. Coba lagi dalam '+s+' detik ('+lock.fails+' kali gagal).';
-    return;
-  }
-  const pass=$('loginPass').value;
-  if(!pass){ err.textContent='Password / kode akses tidak boleh kosong.'; return; }
-  loginBusy=true;
-  try{
-    err.textContent='⏳ Memverifikasi (PBKDF2 100k iter)...';
-    if(await verifyAdmin(pass)){
-      sessionRole='admin'; resetFails(); hideLogin(); showTabNav(); switchTab('foto'); recordActivity();
-    }else if(await verifyCode(pass)){
-      sessionRole='user'; resetFails(); hideLogin(); showTabNav(); switchTab('foto'); recordActivity();
-    }else{
-      const fails=recordFailedAttempt();
-      let msg='Password / kode akses salah. ('+fails+'× gagal)';
-      if(fails>=5){
-        const idx=Math.min(LOCKOUT_TIMES.length-1, fails-5);
-        const s=Math.ceil(LOCKOUT_TIMES[idx]/1000);
-        msg='🔒 Terkunci '+s+' detik ('+fails+'× gagal). Password / kode akses salah.';
-      }
-      err.textContent=msg;
-      $('loginPass').value=''; $('loginPass').focus();
-    }
-  }finally{ loginBusy=false; }
-}
-
-function toggleLoginShow(){ const s=$('loginShow').checked; $('loginPass').type=s?'text':'password'; }
-function toggleAdminShow(){
-  const s=$('adminShow').checked;
-  ['oldAdminPass','newAdminPass','newAdminConfirm'].forEach(id=>{ const el=$(id); if(el) el.type=s?'text':'password'; });
-}
-
-// --- Ganti password admin (mode dev only — PUBLISHED_MODE disable) ---
-async function changeAdminPassword(){
-  const msg=$('adminMsg');
-  if(sessionRole!=='admin'){ msg.textContent='⚠️ Hanya admin yang bisa ganti password.'; return; }
-  if(PUBLISHED_MODE){
-    msg.textContent='⚠️ Mode distribusi: password tidak bisa diganti lokal. Generate ulang file (dari file asli) utk ganti password.';
-    return;
-  }
-  const old=$('oldAdminPass').value, neu=$('newAdminPass').value, conf=$('newAdminConfirm').value;
-  if(!old||!neu||!conf){ msg.textContent='⚠️ Semua kolom wajib diisi.'; return; }
-  if(neu!==conf){ msg.textContent='⚠️ Konfirmasi tidak cocok.'; return; }
-  if(neu.length<MIN_PASSWORD_LEN){ msg.textContent='⚠️ Password baru minimal '+MIN_PASSWORD_LEN+' karakter.'; return; }
-  msg.textContent='⏳ Memverifikasi password lama...';
-  if(!(await verifyAdmin(old))){ msg.textContent='⚠️ Password admin lama salah.'; return; }
-  msg.textContent='⏳ Mengenkripsi password baru...';
-  await setAdminPassword(neu);
-  msg.textContent='✅ Password admin diganti. Kode akses user yang sudah dibuat tetap berlaku.';
-  $('oldAdminPass').value=''; $('newAdminPass').value=''; $('newAdminConfirm').value='';
-}
-
-/* ---------- Kode Akses: dibuat & dicabut admin ---------- */
-function renderCodeList(){
-  const box=$('codeList'); if(!box) return;
-  box.textContent='';
-  const list=getCodes();
-  if(!list.length){
-    const p=document.createElement('p'); p.className='hint'; p.textContent='Belum ada kode akses. Buat kode di atas untuk memberi akses ke orang lain.';
-    box.appendChild(p); return;
-  }
-  list.forEach(e=>{
-    const row=document.createElement('div'); row.className='code-row';
-    const info=document.createElement('div'); info.className='code-info';
-    const nm=document.createElement('b'); nm.textContent=e.label||'(tanpa nama)';
-    const dt=document.createElement('span');
-    const d=e.created?new Date(e.created):null;
-    dt.textContent=' · ID '+e.id+(d?' · dibuat '+d.toLocaleDateString('id-ID'):'');
-    info.appendChild(nm); info.appendChild(dt);
-    const b=document.createElement('button'); b.type='button'; b.className='sec'; b.textContent='Cabut';
-    b.onclick=()=>revokeAccessCode(e.id);
-    row.appendChild(info); row.appendChild(b);
-    box.appendChild(row);
-  });
-}
-
-async function createAccessCode(){
-  const msg=$('codeMsg');
-  if(sessionRole!=='admin'){ msg.textContent='⚠️ Hanya admin yang bisa membuat kode.'; return; }
-  if(PUBLISHED_MODE){ msg.textContent='⚠️ Mode distribusi: buat kode dari file asli, lalu generate ulang index.html.'; return; }
-  if(!isPasswordSet()){ msg.textContent='⚠️ Buat password admin dulu (kartu di atas) sebelum membuat kode akses.'; return; }
-  const label=$('codeLabel').value.trim().slice(0,40);
-  if(!label){ msg.textContent='⚠️ Isi nama penerima kode dulu.'; return; }
-  msg.textContent='⏳ Membuat kode (PBKDF2 100k iter)...';
-  const list=getCodes();
-  let id; do{ id=randomChars(CODE_ID_LEN); }while(list.some(e=>e.id===id));
-  const full=id+randomChars(CODE_LEN-CODE_ID_LEN);
-  const kek=await deriveKEK(full, getSalt());
-  const enc=await encryptToken(kek, randomBytes(32));
-  list.push({id, label, token:toB64(enc), created:Date.now()});
-  saveCodes(list);
-  $('newCodeFor').textContent=label;
-  $('newCodeValue').textContent=formatCode(full);
-  $('newCodeBox').style.display='block';
-  $('codeLabel').value='';
-  msg.textContent='✅ Kode dibuat. Salin dan kirim ke '+label+'. Kode ini tidak akan ditampilkan lagi.';
-  renderCodeList();
-}
-
-async function copyAccessCode(){
-  const txt=$('newCodeValue').textContent, msg=$('codeMsg');
-  try{ await navigator.clipboard.writeText(txt); msg.textContent='✅ Kode disalin ke clipboard.'; }
+async function kompresPdf(file,target,opt,upd,batal){
+  if(!window.PDFLib) throw new Error('pdf-lib belum termuat (periksa internet)');
+  if(file.size<=target) return {blob:file,status:'same',nama:file.name,info:`Sudah di bawah target (${fmt(file.size)} ≤ ${fmt(target)}) — tidak diubah.`};
+  const buf=await file.arrayBuffer();
+  let a;
+  try{ a=await pdfTahapA(buf,file.size,target,upd,batal); }
   catch(e){
-    try{
-      const r=document.createRange(); r.selectNodeContents($('newCodeValue'));
-      const s=getSelection(); s.removeAllRanges(); s.addRange(r);
-      msg.textContent='Kode terpilih — tekan Ctrl+C / Salin manual.';
-    }catch(e2){ msg.textContent='⚠️ Gagal menyalin otomatis. Salin manual dari kotak kode.'; }
+    if(/encrypt/i.test(e.message)) throw new Error('PDF dilindungi sandi/terenkripsi. Buka proteksinya dulu.');
+    if(e.message==='Dibatalkan') throw e;
+    if(opt.fallback!=='B') throw e;
+    a=null;
   }
-}
-
-function hideNewCode(){
-  const b=$('newCodeBox'); if(b) b.style.display='none';
-  const v=$('newCodeValue'); if(v) v.textContent='';
-}
-
-function revokeAccessCode(id){
-  if(sessionRole!=='admin'||PUBLISHED_MODE) return;
-  const list=getCodes(); const e=list.find(x=>x.id===id); if(!e) return;
-  if(!confirm('Cabut kode akses untuk "'+(e.label||id)+'"? Orang ini tidak bisa masuk lagi.')) return;
-  saveCodes(list.filter(x=>x.id!==id));
-  hideNewCode();
-  renderCodeList();
-  $('codeMsg').textContent='✅ Kode dicabut. Jika file sudah dipublikasikan, generate ulang index.html & upload ulang agar pencabutan berlaku di sana.';
-}
-
-// --- Kunci app ---
-function lockApp(){
-  if(!PUBLISHED_MODE && !isPasswordSet()){
-    alert('Aplikasi belum punya password. Buat password admin dulu di tab Pengaturan.');
-    return;
+  const ringkasA=a?`${a.diubah} dari ${a.jumlah} gambar dikompres ulang`+(a.dilewati?`, ${a.dilewati} dilewati (format tidak aman diubah)`:'')+(a.gagal?`, ${a.gagal} gagal`:''):'';
+  const namaOut=baseName(file.name)+'_kompres.pdf';
+  const hasilA=a&&a.size<file.size?a:null;
+  if(hasilA&&hasilA.size<=target){
+    const p=Math.round(hasilA.size/target*100);
+    return {blob:new Blob([hasilA.bytes],{type:'application/pdf'}),status:'ok',nama:namaOut,
+      info:`Hasil ${fmt(hasilA.size)} ≤ target ${fmt(target)} (${p}%) · ${ringkasA} · teks tetap bisa diseleksi`};
   }
-  sessionRole=null;
-  localStorage.removeItem(ACT_KEY);
-  hideNewCode();
-  showLogin('login');
-  showTabNav();
+  if(opt.fallback==='B'){
+    upd('Target belum tercapai dengan kompres gambar — mencoba mengubah halaman jadi gambar…');
+    let b=null;
+    try{ b=await pdfTahapB(buf,target,upd,batal); }
+    catch(e){ if(e.message==='Dibatalkan') throw e; b=null; var errB=e.message; }
+    if(b&&b.size<file.size&&(!hasilA||b.size<=target||b.size<hasilA.size)){
+      const ok=b.size<=target, p=Math.round(b.size/target*100);
+      return {blob:new Blob([b.bytes],{type:'application/pdf'}),status:ok?'ok':'warn',nama:namaOut,
+        info:(ok?`Hasil ${fmt(b.size)} ≤ target ${fmt(target)} (${p}%)`:`Belum tercapai: hasil terkecil ${fmt(b.size)}, target ${fmt(target)}`)+
+             ` · ${b.halaman} halaman diubah jadi gambar (teks TIDAK bisa diseleksi lagi)`};
+    }
+    if(errB&&!hasilA) throw new Error('Tahap halaman→gambar gagal: '+errB);
+  }
+  if(hasilA) return {blob:new Blob([hasilA.bytes],{type:'application/pdf'}),status:'warn',nama:namaOut,
+    info:`Belum tercapai: hasil terkecil ${fmt(hasilA.size)}, target ${fmt(target)} · ${ringkasA}. `+(opt.fallback==='B'?'Coba target lebih besar.':'Aktifkan opsi "ubah halaman jadi gambar" atau naikkan target.')};
+  return {blob:file,status:'warn',nama:file.name,
+    info:`PDF tidak bisa diperkecil lagi dengan cara ini (${fmt(file.size)}, target ${fmt(target)}). `+(opt.fallback==='B'?'Coba target lebih besar.':'Aktifkan opsi "ubah halaman jadi gambar" atau naikkan target.')};
 }
 
-// --- Activity tracking & session timeout ---
-function setupActivityTracking(){
-  ['mousemove','keydown','click','touchstart'].forEach(ev=>{
-    document.addEventListener(ev, ()=>{ if(sessionRole!==null) recordActivity(); }, {passive:true});
+/* =================== ANTARMUKA: 2 panel, antrean banyak file =================== */
+const IKON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 12v6m0 0 3-3m-3 3-3-3"/></svg>';
+const PANEL={
+  img:{id:'kzImg',p:'kzi',minKB:5,def:200,
+    accept:'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp',
+    cocok:f=>/^image\/(jpeg|png|webp)$/.test(f.type||'')||/\.(jpe?g|png|webp)$/i.test(f.name),
+    judul:'Gambar (JPG / PNG / WebP)',
+    petunjuk:'Hasil selalu JPG. Ukuran diukur dari file sungguhan lalu disetel sampai mendekati target (≤ target). PNG/WebP yang sudah di bawah target tidak diubah.',
+    opsi:'<label class="chk"><input type="checkbox" id="kziExif" checked><span>Pertahankan metadata EXIF (GPS, tanggal, kamera) pada foto JPG. Ukuran EXIF sudah dihitung dalam target.</span></label>'},
+  pdf:{id:'kzPdf',p:'kzp',minKB:20,def:500,
+    accept:'application/pdf,.pdf',
+    cocok:f=>/pdf/i.test(f.type||'')||/\.pdf$/i.test(f.name),
+    judul:'File PDF',
+    petunjuk:'Tahap 1: gambar di dalam PDF (JPEG, dan gambar mentah/Flate) dikompres ulang — teks dan struktur halaman tidak disentuh. Ukuran PDF hasil diukur nyata, lalu disetel ulang sampai mendekati target.',
+    opsi:'<div class="kz-row"><div class="kz-field"><label for="kzpFb">Jika target belum tercapai</label><select id="kzpFb"><option value="B" selected>Ubah halaman jadi gambar (target pasti tercapai, teks tidak bisa diseleksi)</option><option value="A">Berhenti — tampilkan hasil terbaik saja (teks tetap utuh)</option></select></div></div>'}
+};
+const status={img:{items:[],jalan:false,batal:false},pdf:{items:[],jalan:false,batal:false}};
+
+function bangunPanel(k){
+  const c=PANEL[k], p=c.p, root=q$(c.id);
+  root.innerHTML=
+   '<section class="card">'+
+   `<h2>1 · Pilih ${c.judul}</h2>`+
+   `<label class="kz-drop" id="${p}Drop" for="${p}File">${IKON}<p id="${p}DropHint">Pilih atau seret &amp; jatuhkan beberapa file sekaligus</p><span class="kz-pick">Pilih file</span></label>`+
+   `<input type="file" id="${p}File" class="vh" multiple accept="${c.accept}">`+
+   `<p class="hint" style="margin-top:8px">${c.petunjuk}</p></section>`+
+   '<section class="card"><h2>2 · Target ukuran</h2>'+
+   '<div class="kz-row">'+
+   `<div class="kz-field"><label for="${p}Target">Ukuran maksimum tiap file</label><input id="${p}Target" type="number" min="1" step="any" value="${c.def}" inputmode="decimal"></div>`+
+   `<div class="kz-field kz-unit"><label for="${p}Unit">Satuan</label><select id="${p}Unit"><option value="KB" selected>KB</option><option value="MB">MB</option></select></div>`+
+   '</div>'+c.opsi+
+   `<div class="actions"><button type="button" id="${p}Go" disabled>Mulai kompres</button>`+
+   `<button type="button" class="sec" id="${p}Stop" disabled>Batalkan</button>`+
+   `<button type="button" class="sec" id="${p}Clear" disabled>Kosongkan daftar</button>`+
+   `<button type="button" class="dl" id="${p}Zip" style="display:none">Unduh semua (ZIP)</button></div>`+
+   `<div class="kz-bar" id="${p}Bar"><div></div></div><div class="kz-st" id="${p}St" role="status" aria-live="polite">Belum ada file.</div>`+
+   `<ul class="kz-list" id="${p}List"></ul></section>`;
+  const drop=q$(p+'Drop');
+  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('dragover');}));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('dragover');}));
+  drop.addEventListener('drop',e=>tambah(k,e.dataTransfer.files));
+  q$(p+'File').addEventListener('change',e=>{tambah(k,e.target.files);e.target.value='';});
+  q$(p+'Go').addEventListener('click',()=>mulai(k));
+  q$(p+'Stop').addEventListener('click',()=>{status[k].batal=true;q$(p+'St').textContent='Membatalkan…';});
+  q$(p+'Clear').addEventListener('click',()=>{status[k].items=[];render(k);});
+  q$(p+'Zip').addEventListener('click',()=>unduhZip(k));
+}
+function tambah(k,fileList){
+  const s=status[k], c=PANEL[k]; let ditolak=0;
+  for(const f of Array.from(fileList||[])){
+    if(!c.cocok(f)){ ditolak++; continue; }
+    if(s.items.some(x=>x.file.name===f.name&&x.file.size===f.size&&x.file.lastModified===f.lastModified)) continue;
+    s.items.push({file:f,st:'wait',info:'Menunggu',nama:'',blob:null});
+  }
+  render(k);
+  if(ditolak) q$(c.p+'St').textContent=`${ditolak} file dilewati (format tidak sesuai).`;
+}
+function render(k){
+  const s=status[k], p=PANEL[k].p, ul=q$(p+'List');
+  ul.textContent='';
+  s.items.forEach((it,idx)=>{
+    const li=document.createElement('li'); li.className='kz-item';
+    const top=document.createElement('div'); top.className='kz-top';
+    const kiri=document.createElement('div');
+    const nm=document.createElement('div'); nm.className='kz-name'; nm.textContent=it.file.name;
+    const sz=document.createElement('div'); sz.className='kz-size';
+    sz.textContent=fmt(it.file.size)+(it.blob?` → ${fmt(it.blob.size)}`:'');
+    kiri.append(nm,sz);
+    const acts=document.createElement('div'); acts.className='kz-acts';
+    if(it.blob&&it.st!=='err'){
+      const b=document.createElement('button'); b.type='button'; b.className='dl'; b.textContent='Unduh';
+      b.addEventListener('click',()=>simpan(it.blob,it.nama)); acts.append(b);
+    }
+    if(!s.jalan){
+      const x=document.createElement('button'); x.type='button'; x.className='sec'; x.textContent='Hapus'; x.setAttribute('aria-label','Hapus '+it.file.name);
+      x.addEventListener('click',()=>{s.items.splice(idx,1);render(k);}); acts.append(x);
+    }
+    top.append(kiri,acts);
+    const info=document.createElement('div');
+    info.className='kz-info '+({ok:'kz-ok',same:'kz-ok',warn:'kz-warn',err:'kz-err',run:'kz-run'}[it.st]||'');
+    info.textContent=({ok:'✅ ',same:'ℹ️ ',warn:'⚠️ ',err:'❌ ',run:'⏳ '}[it.st]||'')+it.info;
+    it.elInfo=info;
+    li.append(top,info); ul.append(li);
   });
-  setInterval(()=>{ if(sessionRole!==null) checkSessionTimeout(); }, 60000);
+  const adaHasil=s.items.some(i=>i.blob&&i.st!=='err');
+  q$(p+'Go').disabled=s.jalan||!s.items.length;
+  q$(p+'Stop').disabled=!s.jalan;
+  q$(p+'Clear').disabled=s.jalan||!s.items.length;
+  const z=q$(p+'Zip'); z.style.display=(adaHasil&&!s.jalan&&s.items.filter(i=>i.blob).length>1)?'inline-flex':'none';
+  if(!s.items.length) q$(p+'St').textContent='Belum ada file.';
 }
-
-// --- Init ---
-// Sudah ada password (atau versi distribusi) -> wajib login.
-// Belum ada password + file lokal -> terbuka sbg admin; admin membuat password di tab Pengaturan.
-// Belum ada password + situs ter-host -> diblokir (orang lain tidak bisa membuat password).
-(async function initPassword(){
-  if(!PUBLISHED_MODE) localStorage.removeItem(OLD_USER_KEY);
-  if(PUBLISHED_MODE || isPasswordSet()){
-    showLogin('login');
-  }else if(isLocalContext()){
-    sessionRole='admin';
-    hideLogin();
-    showTabNav();
-    switchTab('set');
-    const m=$('createMsg'); if(m) m.textContent='Selamat datang, admin. Buat password admin di sini untuk mengunci aplikasi.';
-  }else{
-    showLogin('blocked');
+function ambilTarget(k){
+  const p=PANEL[k].p, v=parseFloat(String(q$(p+'Target').value).replace(',','.'));
+  const bytes=(q$(p+'Unit').value==='MB'?v*1048576:v*1024);
+  return {bytes,ok:isFinite(bytes)&&bytes>=PANEL[k].minKB*1024};
+}
+async function mulai(k){
+  const s=status[k], c=PANEL[k], p=c.p;
+  if(s.jalan||!s.items.length) return;
+  const t=ambilTarget(k);
+  if(!t.ok){ q$(p+'St').textContent=`Target tidak valid (minimal ${c.minKB} KB).`; return; }
+  const opt=k==='img'?{keepExif:q$('kziExif').checked}:{fallback:q$('kzpFb').value};
+  s.jalan=true; s.batal=false;
+  s.items.forEach(i=>{i.st='wait';i.info='Menunggu';i.blob=null;});
+  render(k);
+  const bar=q$(p+'Bar'); bar.style.display='block';
+  const set=pct=>{bar.firstElementChild.style.width=pct+'%';};
+  set(0);
+  let selesai=0;
+  for(const it of s.items){
+    if(s.batal){ it.st='err'; it.info='Dibatalkan'; continue; }
+    it.st='run'; it.info='Memulai…'; render(k);
+    q$(p+'St').textContent=`Memproses ${selesai+1} dari ${s.items.length}: ${it.file.name}`;
+    const upd=txt=>{ it.info=txt; if(it.elInfo) it.elInfo.textContent='⏳ '+txt; };
+    try{
+      const r=k==='img'?await kompresGambar(it.file,t.bytes,opt,upd,()=>s.batal):await kompresPdf(it.file,t.bytes,opt,upd,()=>s.batal);
+      it.st=r.status; it.info=r.info; it.blob=r.blob; it.nama=r.nama;
+    }catch(e){
+      it.st='err'; it.info=(e&&e.message)||String(e); it.blob=null;
+    }
+    selesai++; set(Math.round(selesai/s.items.length*100)); render(k);
+    await sleep(0);
   }
-  showTabNav();
-  setupActivityTracking();
+  s.jalan=false; render(k);
+  const n=s.items.length, ok=s.items.filter(i=>i.st==='ok'||i.st==='same').length;
+  const warn=s.items.filter(i=>i.st==='warn').length, err=s.items.filter(i=>i.st==='err').length;
+  q$(p+'St').textContent=s.batal?`Dibatalkan. ${ok} dari ${n} file selesai.`:
+    `Selesai: ${ok} tercapai`+(warn?`, ${warn} belum tercapai`:'')+(err?`, ${err} gagal`:'')+` (dari ${n} file).`;
+}
+function simpan(blob,nama){
+  const u=URL.createObjectURL(blob), a=document.createElement('a');
+  a.download=nama; a.href=u; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u),15000);
+}
+async function unduhZip(k){
+  const s=status[k], p=PANEL[k].p, st=q$(p+'St');
+  const ada=s.items.filter(i=>i.blob&&i.st!=='err');
+  if(!ada.length) return;
+  if(typeof JSZip==='undefined'){
+    st.textContent='JSZip tidak termuat — mengunduh satu per satu…';
+    for(const i of ada){ simpan(i.blob,i.nama); await sleep(400); }
+    return;
+  }
+  st.textContent='Menyusun ZIP…';
+  const zip=new JSZip(), dipakai=new Set();
+  for(const i of ada){
+    let n=i.nama||i.file.name, b=n, c=2;
+    while(dipakai.has(n.toLowerCase())){ n=b.replace(/(\.[^.]+)?$/,m=>` (${c++})${m}`); }
+    dipakai.add(n.toLowerCase()); zip.file(n,i.blob);
+  }
+  const out=await zip.generateAsync({type:'blob',compression:'STORE'});
+  simpan(out,`${k==='img'?'gambar':'pdf'}_kompres_${ada.length}_file.zip`);
+  st.textContent=`ZIP diunduh (${ada.length} file, ${fmt(out.size)}).`;
+}
+function kzSwitch(k){
+  q$('kzImg').style.display=k==='img'?'block':'none';
+  q$('kzPdf').style.display=k==='pdf'?'block':'none';
+  q$('kzBtnImg').classList.toggle('active',k==='img'); q$('kzBtnImg').setAttribute('aria-selected',k==='img'?'true':'false');
+  q$('kzBtnPdf').classList.toggle('active',k==='pdf'); q$('kzBtnPdf').setAttribute('aria-selected',k==='pdf'?'true':'false');
+}
+bangunPanel('img'); bangunPanel('pdf');
+q$('kzBtnImg').addEventListener('click',()=>kzSwitch('img'));
+q$('kzBtnPdf').addEventListener('click',()=>kzSwitch('pdf'));
+// dipakai uji otomatis
+window.__kz={fitJpeg,kompresGambar,kompresPdf,tambah,mulai,status};
 })();
-
-/* ---------- Generate Versi Distribusi ----------
-   Menanam salt + token admin + daftar kode akses (terenkripsi) ke index.html baru.
-   Upload hasilnya ke GitHub. Pengunjung hanya bisa masuk dengan password admin atau kode akses. ---------- */
-async function generatePublishedVersion(){
-  const msg=$('publishMsg');
-  if(sessionRole!=='admin'){
-    if(msg) msg.textContent='⚠️ Hanya admin yg bisa generate versi distribusi.';
-    return;
-  }
-  if(PUBLISHED_MODE){
-    if(msg) msg.textContent='⚠️ File ini sudah versi distribusi. Pakai file asli (sebelum publish) utk generate ulang.';
-    return;
-  }
-  const salt=localStorage.getItem(SALT_KEY);
-  const adminToken=localStorage.getItem(ADMIN_KEY);
-  if(!salt||!adminToken){
-    if(msg) msg.textContent='⚠️ Buat password admin dulu di kartu "Buat Password Admin" sebelum generate.';
-    return;
-  }
-  const codes=getCodes();
-  if(!codes.length){
-    if(!confirm('Belum ada kode akses. Versi distribusi hanya bisa dibuka dengan password admin. Lanjut generate?')) return;
-  }
-  if(msg) msg.textContent='⏳ Menyiapkan file distribusi...';
-  const codesB64=codes.length?toB64(new TextEncoder().encode(JSON.stringify(codes))):'';
-  // Salin DOM lalu bersihkan state sementara supaya file hasil bersih
-  const clone=document.documentElement.cloneNode(true);
-  const cvc=clone.querySelector('#cv');
-  if(cvc){ cvc.removeAttribute('width'); cvc.removeAttribute('height'); cvc.removeAttribute('style'); }
-  const bgc=clone.querySelector('#bg');
-  if(bgc){ bgc.removeAttribute('width'); bgc.removeAttribute('height'); }
-  const ov=clone.querySelector('#loginOverlay');
-  if(ov) ov.setAttribute('style','display:none');
-  const nc=clone.querySelector('#newCodeBox');
-  if(nc) nc.setAttribute('style','display:none');
-  const ncv=clone.querySelector('#newCodeValue');
-  if(ncv) ncv.textContent='';
-  let html='<!DOCTYPE html>\n'+clone.outerHTML;
-  const rep=(name,val)=>{
-    const re=new RegExp("^const "+name+"='[^']*';","m");
-    if(!re.test(html)) return false;
-    html=html.replace(re,()=>"const "+name+"='"+val+"';");
-    return true;
-  };
-  const ok=rep('EMBEDDED_SALT',salt) && rep('EMBEDDED_ADMIN_TOKEN',adminToken) && rep('EMBEDDED_CODES',codesB64);
-  if(!ok){
-    if(msg) msg.textContent='⚠️ Gagal inject data. Konstanta EMBEDDED tidak ditemukan di HTML.';
-    return;
-  }
-  const blob=new Blob([html], {type:'text/html'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download='index.html';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  setTimeout(()=>URL.revokeObjectURL(url), 1000);
-  if(msg) msg.textContent='✅ index.html (versi distribusi) diunduh dengan '+codes.length+' kode akses. Upload ke GitHub utk replace index.html lama.';
-}
 </script>
 <script>
 /* ===== Latar bintang "warp" ===== */
@@ -2530,6 +2146,5 @@ let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(resize,200)
 resize();start();
 })();
 </script>
-
-
-</body></html>
+</body>
+</html>

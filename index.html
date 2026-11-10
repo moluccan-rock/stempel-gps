@@ -130,7 +130,11 @@
 </style>
 </head>
 <body>
-<script>try{if(localStorage.getItem('sg_pin'))document.body.classList.add('pinlock')}catch(e){}</script>
+<script>
+/* PIN PERMANEN: ganti null di bawah dengan baris yang dibuat tombol "⚙️ PIN" → agar terkunci di SEMUA browser/tautan. */
+window.PIN_TETAP={"s":"fcGRAbch18peOpooN0XcuA==","h":"ls1F76zimqk2YFHH23KYpuQJXcg1uXM5ORe1gjgHNJI=","it":200000,"auto":5};
+try{if(window.PIN_TETAP||localStorage.getItem('sg_pin'))document.body.classList.add('pinlock')}catch(e){if(window.PIN_TETAP)document.body.classList.add('pinlock')}
+</script>
 <canvas id="bg" aria-hidden="true"></canvas>
 <div id="pinLock" role="dialog" aria-modal="true" aria-labelledby="pinJudul"></div>
 <header class="top">
@@ -2199,10 +2203,13 @@ async function hash(pin,salt,it){
   return new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt,iterations:it},k,256));
 }
 function sama(a,b){let d=a.length^b.length;for(let i=0;i<a.length&&i<b.length;i++)d|=a[i]^b[i];return d===0;}
-function baca(){try{return JSON.parse(ls.get(K)||'null');}catch(e){return null;}}
+const TETAP=()=>window.PIN_TETAP||null;
+function baca(){if(TETAP())return TETAP();try{return JSON.parse(ls.get(K)||'null');}catch(e){return null;}}
 async function buat(pin,auto){
   const salt=crypto.getRandomValues(new Uint8Array(16));
-  return ls.set(K,JSON.stringify({s:b64(salt),h:b64(await hash(pin,salt,IT)),it:IT,auto}));
+  const d={s:b64(salt),h:b64(await hash(pin,salt,IT)),it:IT,auto};
+  if(TETAP()) return d;
+  return ls.set(K,JSON.stringify(d))?d:null;
 }
 async function cocok(pin){const d=baca(); return !!d&&sama(await hash(pin,unb64(d.s),d.it||IT),unb64(d.h));}
 const gagal={get(){try{return JSON.parse(ls.get(KF)||'{"n":0,"until":0}');}catch(e){return{n:0,until:0};}},set(o){ls.set(KF,JSON.stringify(o));},reset(){ls.del(KF);}};
@@ -2222,7 +2229,7 @@ function kunci(){
   tampil(IK+'<h2 id="pinJudul">Suanggi Geotag terkunci</h2><p>Masukkan PIN untuk membuka.</p>'+
    '<input id="pIn" class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" aria-label="PIN" placeholder="••••">'+
    '<div class="perr" id="pErr" role="alert"></div><div class="pact"><button type="button" id="pOk">Buka</button></div>'+
-   '<p style="margin-top:14px;font-size:.75rem">Lupa PIN? Hapus data situs browser ini untuk mengatur ulang.</p>');
+   '<p style="margin-top:14px;font-size:.75rem">'+(TETAP()?'Lupa PIN? Pemilik aplikasi dapat mengganti baris PIN_TETAP di index.html.':'Lupa PIN? Hapus data situs browser ini untuk mengatur ulang.')+'</p>');
   $('pIn').addEventListener('input',angka);
   $('pIn').addEventListener('keydown',e=>{if(e.key==='Enter')buka();});
   $('pOk').addEventListener('click',buka);
@@ -2253,6 +2260,36 @@ async function buka(){
   jedaCek(); if(!inp.disabled) inp.focus();
 }
 
+/* ---- kode PIN permanen (tertanam di index.html, berlaku di semua browser & tautan) ---- */
+function kodeTetap(d){
+  const baris='window.PIN_TETAP='+JSON.stringify(d)+';';
+  tampil(IK+'<h2 id="pinJudul">'+(TETAP()?'PIN baru siap':'PIN terpasang')+'</h2>'+
+   '<p style="text-align:left">'+(TETAP()?'':'PIN ini baru berlaku <b>di browser ini saja</b>. ')+
+   'Supaya aplikasi <b>selalu terkunci</b> di semua browser &amp; tautan: klik <b>Unduh index.html berisi PIN</b>, timpa file lama di folder repo, lalu <code>git push</code>.</p>'+
+   '<button type="button" id="pUnduh" style="width:100%">⬇️ Unduh index.html berisi PIN</button>'+
+   '<details style="margin-top:10px;text-align:left"><summary style="cursor:pointer;color:var(--muted);font-size:.8125rem">Cara manual (salin baris)</summary><p style="margin:8px 0 6px;font-size:.8125rem">Ganti baris <code>window.PIN_TETAP=...;</code> di index.html dengan baris ini:</p>'+
+   '<textarea id="pKode" readonly rows="5" style="width:100%;box-sizing:border-box;font:12px/1.4 monospace;background:#0a1020;color:#e5e9f0;border:1px solid var(--border);border-radius:8px;padding:8px">'+baris.replace(/</g,'&lt;')+'</textarea><button type="button" class="sec" id="pSalin" style="width:100%;margin-top:6px">Salin baris</button></details>'+
+   '<div class="perr" id="pErr" role="status" style="color:var(--success)"></div>'+
+   '<div class="pact"><button type="button" class="sec" id="pTutup">Selesai</button></div>');
+  $('pUnduh').addEventListener('click',async()=>{
+    const er=$('pErr'); er.style.color='var(--success)';
+    try{
+      const r=await fetch(location.href.split('#')[0].split('?')[0],{cache:'no-store'}); if(!r.ok) throw new Error('http '+r.status);
+      const src=await r.text(), re=/window\.PIN_TETAP=(?:null|\{[^\n]*?\});/;
+      if(!re.test(src)) throw new Error('baris PIN_TETAP tidak ditemukan');
+      const out=src.replace(re,()=>baris);
+      const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([out],{type:'text/html'})); a.download='index.html';
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+      er.textContent='Terunduh ✔ — timpa index.html lama lalu git push.';
+    }catch(e){ er.style.color='#fca5a5'; er.textContent='Tidak bisa mengunduh otomatis ('+e.message+'). Buka lewat alamat https:// atau pakai cara manual di bawah.'; }
+  });
+  $('pTutup').addEventListener('click',tutup);
+  $('pSalin').addEventListener('click',async()=>{
+    try{await navigator.clipboard.writeText(baris);}catch(e){$('pKode').select();document.execCommand&&document.execCommand('copy');}
+    $('pErr').textContent='Tersalin ✔';
+  });
+  fokus('pUnduh');
+}
 /* ---- pengaturan: pasang / ganti / hapus ---- */
 function aturBaru(judul,lama){
   tampil(IK+'<h2 id="pinJudul">'+judul+'</h2><p>Pilih 4–8 angka. Jangan pakai tanggal lahir.</p>'+
@@ -2268,9 +2305,9 @@ function aturBaru(judul,lama){
     if(/^(\d)\1+$/.test(a)||'0123456789'.includes(a)||'9876543210'.includes(a)){er.textContent='PIN terlalu mudah ditebak (mis. 1234 atau 1111).';return;}
     if(a!==b){er.textContent='Kedua PIN tidak sama.';return;}
     $('pSimpan').disabled=true;
-    let ok=false; try{ok=await buat(a,parseInt($('pAuto').value,10));}catch(e){}
-    if(!ok){er.textContent='Gagal menyimpan (penyimpanan browser diblokir / mode privat).';$('pSimpan').disabled=false;return;}
-    gagal.reset(); tutup(); segarUI(); mulaiTimer();
+    let d=null; try{d=await buat(a,parseInt($('pAuto').value,10));}catch(e){}
+    if(!d){er.textContent='Gagal menyimpan (penyimpanan browser diblokir / mode privat).';$('pSimpan').disabled=false;return;}
+    gagal.reset(); segarUI(); mulaiTimer(); kodeTetap(d);
   };
   $('pSimpan').addEventListener('click',simpan);
   ['pNew','pNew2'].forEach(i=>$(i).addEventListener('keydown',e=>{if(e.key==='Enter')simpan();}));
@@ -2290,7 +2327,9 @@ function atur(){
     if(!ok){const g2=gagal.get(); g2.n=(g2.n||0)+1; if(g2.n>=5) g2.until=Date.now()+Math.min(900,15*Math.pow(2,g2.n-5))*1000; gagal.set(g2); $('pErr').textContent='PIN salah.'; $('pCur').value=''; return false;}
     gagal.reset(); return true;};
   $('pGanti').addEventListener('click',async()=>{if(await cek()) aturBaru('Ganti PIN');});
-  $('pHapus').addEventListener('click',async()=>{if(await cek()){ls.del(K);gagal.reset();clearTimeout(timer);tutup();segarUI();}});
+  $('pHapus').addEventListener('click',async()=>{if(!(await cek()))return;
+    if(TETAP()){tampil(IK+'<h2 id="pinJudul">Hapus PIN permanen</h2><p>Untuk menghapus, buka <code>index.html</code> lalu ganti baris <code>window.PIN_TETAP=...;</code> menjadi <code>window.PIN_TETAP=null;</code>, simpan dan upload ulang.</p><div class="pact"><button type="button" id="pTutup">Mengerti</button></div>');$('pTutup').addEventListener('click',tutup);return;}
+    ls.del(K);gagal.reset();clearTimeout(timer);tutup();segarUI();});
   fokus('pCur');
 }
 function segarUI(){const ada=!!baca();$('pinKunci').style.display=ada?'':'none';$('pinAtur').textContent=ada?'⚙️ PIN':'🔓 Pasang PIN';}

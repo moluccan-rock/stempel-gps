@@ -132,7 +132,7 @@
 <body>
 <script>
 /* PIN PERMANEN: ganti null di bawah dengan baris yang dibuat tombol "⚙️ PIN" → agar terkunci di SEMUA browser/tautan. */
-window.PIN_TETAP={"s":"fcGRAbch18peOpooN0XcuA==","h":"ls1F76zimqk2YFHH23KYpuQJXcg1uXM5ORe1gjgHNJI=","it":200000,"auto":5};
+window.PIN_TETAP=null;
 try{if(window.PIN_TETAP||localStorage.getItem('sg_pin'))document.body.classList.add('pinlock')}catch(e){if(window.PIN_TETAP)document.body.classList.add('pinlock')}
 </script>
 <canvas id="bg" aria-hidden="true"></canvas>
@@ -2332,7 +2332,10 @@ function atur(){
     ls.del(K);gagal.reset();clearTimeout(timer);tutup();segarUI();});
   fokus('pCur');
 }
-function segarUI(){const ada=!!baca();$('pinKunci').style.display=ada?'':'none';$('pinAtur').textContent=ada?'⚙️ PIN':'🔓 Pasang PIN';}
+const ADMIN=/(^|[?&])admin(=|&|$)/.test(location.search);
+function segarUI(){const ada=!!baca();$('pinKunci').style.display=ada?'':'none';$('pinAtur').textContent=ada?'⚙️ PIN':'🔓 Pasang PIN';
+  /* setelah PIN terpasang, tombol pengaturan hanya tampil bila alamat diakhiri ?admin */
+  $('pinAtur').style.display=(!ada||ADMIN)?'':'none';}
 
 /* ---- kunci otomatis saat tidak aktif ---- */
 function menit(){const d=baca();return d&&d.auto?d.auto:0;}

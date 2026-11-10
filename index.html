@@ -2229,7 +2229,7 @@ function kunci(){
   tampil(IK+'<h2 id="pinJudul">Suanggi Geotag terkunci</h2><p>Masukkan PIN untuk membuka.</p>'+
    '<input id="pIn" class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" aria-label="PIN" placeholder="••••">'+
    '<div class="perr" id="pErr" role="alert"></div><div class="pact"><button type="button" id="pOk">Buka</button></div>'+
-   '<p style="margin-top:14px;font-size:.75rem">'+(TETAP()?'Lupa PIN? Pemilik aplikasi dapat mengganti baris PIN_TETAP di index.html.':'Lupa PIN? Hapus data situs browser ini untuk mengatur ulang.')+'</p>');
+   '<p style="margin-top:14px;font-size:.75rem">'+(TETAP()?'Lupa PIN? Hubungi Pemilik, jang Paksa.':'Lupa PIN? Hapus data situs browser ini untuk mengatur ulang.')+'</p>');
   $('pIn').addEventListener('input',angka);
   $('pIn').addEventListener('keydown',e=>{if(e.key==='Enter')buka();});
   $('pOk').addEventListener('click',buka);

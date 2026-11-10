@@ -132,7 +132,7 @@
 <body>
 <script>
 /* PIN PERMANEN: ganti null di bawah dengan baris yang dibuat tombol "⚙️ PIN" → agar terkunci di SEMUA browser/tautan. */
-window.PIN_TETAP=null;
+window.PIN_TETAP={"s":"d/myFNeZMn7/MoUezLwoKw==","h":"7Wc4pxtKc36N8z4XRjLSZDS4HlZ4mZ1bENZ6vABMfTY=","it":200000,"auto":5};
 try{if(window.PIN_TETAP||localStorage.getItem('sg_pin'))document.body.classList.add('pinlock')}catch(e){if(window.PIN_TETAP)document.body.classList.add('pinlock')}
 </script>
 <canvas id="bg" aria-hidden="true"></canvas>
@@ -2229,7 +2229,7 @@ function kunci(){
   tampil(IK+'<h2 id="pinJudul">Suanggi Geotag terkunci</h2><p>Masukkan PIN untuk membuka.</p>'+
    '<input id="pIn" class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" aria-label="PIN" placeholder="••••">'+
    '<div class="perr" id="pErr" role="alert"></div><div class="pact"><button type="button" id="pOk">Buka</button></div>'+
-   '<p style="margin-top:14px;font-size:.75rem">'+(TETAP()?'Lupa PIN? Pemilik aplikasi dapat mengganti baris PIN_TETAP di index.html.':'Lupa PIN? Hapus data situs browser ini untuk mengatur ulang.')+'</p>');
+   '<p style="margin-top:14px;font-size:.75rem">'+(TETAP()?'Lupa PIN? Hubungi Pemilik, jang Paksa.':'Lupa PIN? Hapus data situs browser ini untuk mengatur ulang.')+'</p>');
   $('pIn').addEventListener('input',angka);
   $('pIn').addEventListener('keydown',e=>{if(e.key==='Enter')buka();});
   $('pOk').addEventListener('click',buka);
@@ -2332,7 +2332,10 @@ function atur(){
     ls.del(K);gagal.reset();clearTimeout(timer);tutup();segarUI();});
   fokus('pCur');
 }
-function segarUI(){const ada=!!baca();$('pinKunci').style.display=ada?'':'none';$('pinAtur').textContent=ada?'⚙️ PIN':'🔓 Pasang PIN';}
+const ADMIN=/(^|[?&])admin(=|&|$)/.test(location.search);
+function segarUI(){const ada=!!baca();$('pinKunci').style.display=ada?'':'none';$('pinAtur').textContent=ada?'⚙️ PIN':'🔓 Pasang PIN';
+  /* setelah PIN terpasang, tombol pengaturan hanya tampil bila alamat diakhiri ?admin */
+  $('pinAtur').style.display=(!ada||ADMIN)?'':'none';}
 
 /* ---- kunci otomatis saat tidak aktif ---- */
 function menit(){const d=baca();return d&&d.auto?d.auto:0;}

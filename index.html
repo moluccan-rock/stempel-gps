@@ -134,7 +134,7 @@
 /* PIN PERMANEN: ganti null di bawah dengan baris yang dibuat tombol "⚙️ PIN" → agar terkunci di SEMUA browser/tautan. */
 window.PIN_TETAP=null;
 /* PIN OTOMATIS: isi dengan alamat Web App Apps Script (https://script.google.com/macros/s/.../exec) agar PIN berganti otomatis & dikirim ke email admin. */
-window.PIN_API=null;
+window.PIN_API="https://script.google.com/macros/s/AKfycbzns9_3gHPNQAC3JJWcv9NXpx1tH2Ceej5NZwhtdhg061hF28SJXaCM3ABkWBwTvWD9/exec";
 try{if(window.PIN_API||window.PIN_TETAP||localStorage.getItem('sg_pin'))document.body.classList.add('pinlock')}catch(e){if(window.PIN_API||window.PIN_TETAP)document.body.classList.add('pinlock')}
 </script>
 <canvas id="bg" aria-hidden="true"></canvas>

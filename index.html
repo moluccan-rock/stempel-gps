@@ -2209,10 +2209,15 @@ const TETAP=()=>window.PIN_TETAP||null;
 const API=()=>window.PIN_API||null;
 let tok=null, pesanKunci='';
 async function panggil(o){
-  try{const c=new AbortController(),t=setTimeout(()=>c.abort(),15000);
-    const r=await fetch(API(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(o),signal:c.signal,cache:'no-store'});
-    clearTimeout(t); return await r.json();}
-  catch(e){return {galat:1};}
+  let st='';
+  try{const c=new AbortController(),t=setTimeout(()=>c.abort(),30000);
+    const r=await fetch(API(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(o),signal:c.signal});
+    clearTimeout(t); st=r.status;
+    const tx=await r.text(); let j;
+    try{j=JSON.parse(tx);}catch(e){return {galat:1,rinci:'balasan bukan JSON (status '+st+(/accounts\.google|signin|login/i.test(tx)?', diminta login Google → akses deployment harus "Anyone"':/<html/i.test(tx)?', halaman error dari Google':'')+')'};}
+    if(j&&j.galat) j.rinci='error di server: '+(j.err||'tidak diketahui');
+    return j;}
+  catch(e){return {galat:1,rinci:e&&e.name==='AbortError'?'waktu habis (30 dtk)':'permintaan diblokir browser/jaringan ('+((e&&e.message)||e)+')'};}
 }
 function cid(){let v=ls.get('sg_cid');if(!v){v=Array.from((window.crypto&&crypto.getRandomValues)?crypto.getRandomValues(new Uint8Array(9)):Array.from({length:9},()=>Math.random()*256|0),b=>('0'+b.toString(16)).slice(-2)).join('');ls.set('sg_cid',v);}return v;}
 async function cekSesi(){
@@ -2270,7 +2275,7 @@ async function buka(){
   else { try{benar=await cocok(inp.value);}catch(e){} }
   if(!benar&&API()){
     inp.value=''; $('pOk').disabled=false;
-    if(!srv||srv.galat){er.textContent='Tidak bisa menghubungi server. Periksa internet lalu coba lagi.';inp.focus();return;}
+    if(!srv||srv.galat){er.textContent='Tidak bisa menghubungi server. Periksa internet lalu coba lagi.'+(srv&&srv.rinci?' [Kode: '+srv.rinci+']':'');inp.focus();return;}
     if(srv.jeda){gagal.set({n:5,until:Date.now()+srv.jeda*1000});jedaCek();} else {er.textContent=srv.pesan||'PIN salah.';inp.focus();}
     return;
   }

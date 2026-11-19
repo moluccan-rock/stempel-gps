@@ -2208,7 +2208,7 @@ function sama(a,b){let d=a.length^b.length;for(let i=0;i<a.length&&i<b.length;i+
 const TETAP=()=>window.PIN_TETAP||null;
 const API=()=>window.PIN_API||null;
 let tok=null, pesanKunci='';
-async function panggil(o){
+async function panggilPost(o){
   let st='';
   try{const c=new AbortController(),t=setTimeout(()=>c.abort(),30000);
     const r=await fetch(API(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(o),signal:c.signal});
@@ -2218,6 +2218,27 @@ async function panggil(o){
     if(j&&j.galat) j.rinci='error di server: '+(j.err||'tidak diketahui');
     return j;}
   catch(e){return {galat:1,rinci:e&&e.name==='AbortError'?'waktu habis (30 dtk)':'permintaan diblokir browser/jaringan ('+((e&&e.message)||e)+')'};}
+}
+function jsonp(o){
+  return new Promise(res=>{
+    const cb='__sg'+Math.random().toString(36).slice(2,10), sc=document.createElement('script'); let sudah=false, t=0;
+    const fin=r=>{if(sudah)return;sudah=true;clearTimeout(t);try{delete window[cb];}catch(e){window[cb]=undefined;}sc.remove();res(r);};
+    window[cb]=d=>fin(d&&typeof d==='object'?d:{galat:1,rinci:'balasan JSONP tidak valid'});
+    sc.onerror=()=>fin({galat:1,rinci:'skrip dari server diblokir browser/ekstensi/jaringan'});
+    const qs=Object.keys(o).map(k=>encodeURIComponent(k)+'='+encodeURIComponent(o[k])).join('&');
+    sc.src=API()+(API().indexOf('?')<0?'?':'&')+qs+'&cb='+cb+'&_='+Date.now();
+    t=setTimeout(()=>fin({galat:1,rinci:'waktu habis (JSONP)'}),30000);
+    document.head.appendChild(sc);
+  });
+}
+async function panggil(o){
+  const r=await panggilPost(o);
+  if(r&&r.galat&&!r.err){                      // POST gagal sebelum sampai server → coba jalur cadangan
+    const r2=await jsonp(o);
+    if(r2&&!r2.galat) return r2;
+    r2.rinci='POST: '+(r.rinci||'gagal')+' | cadangan: '+(r2.rinci||'gagal'); return r2;
+  }
+  return r;
 }
 function cid(){let v=ls.get('sg_cid');if(!v){v=Array.from((window.crypto&&crypto.getRandomValues)?crypto.getRandomValues(new Uint8Array(9)):Array.from({length:9},()=>Math.random()*256|0),b=>('0'+b.toString(16)).slice(-2)).join('');ls.set('sg_cid',v);}return v;}
 async function cekSesi(){

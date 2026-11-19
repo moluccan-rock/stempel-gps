@@ -132,8 +132,10 @@
 <body>
 <script>
 /* PIN PERMANEN: ganti null di bawah dengan baris yang dibuat tombol "⚙️ PIN" → agar terkunci di SEMUA browser/tautan. */
-window.PIN_TETAP={"s":"fn4Jd94MN2RUR7MxDRAhkw==","h":"CaB85+3XuxW11H6eCaC3SRiNIA4dLQTF+FP8FeEmphY=","it":200000,"auto":5};
-try{if(window.PIN_TETAP||localStorage.getItem('sg_pin'))document.body.classList.add('pinlock')}catch(e){if(window.PIN_TETAP)document.body.classList.add('pinlock')}
+window.PIN_TETAP=null;
+/* PIN OTOMATIS: isi dengan alamat Web App Apps Script (https://script.google.com/macros/s/.../exec) agar PIN berganti otomatis & dikirim ke email admin. */
+window.PIN_API=null;
+try{if(window.PIN_API||window.PIN_TETAP||localStorage.getItem('sg_pin'))document.body.classList.add('pinlock')}catch(e){if(window.PIN_API||window.PIN_TETAP)document.body.classList.add('pinlock')}
 </script>
 <canvas id="bg" aria-hidden="true"></canvas>
 <div id="pinLock" role="dialog" aria-modal="true" aria-labelledby="pinJudul"></div>
@@ -2204,7 +2206,21 @@ async function hash(pin,salt,it){
 }
 function sama(a,b){let d=a.length^b.length;for(let i=0;i<a.length&&i<b.length;i++)d|=a[i]^b[i];return d===0;}
 const TETAP=()=>window.PIN_TETAP||null;
-function baca(){if(TETAP())return TETAP();try{return JSON.parse(ls.get(K)||'null');}catch(e){return null;}}
+const API=()=>window.PIN_API||null;
+let tok=null, pesanKunci='';
+async function panggil(o){
+  try{const c=new AbortController(),t=setTimeout(()=>c.abort(),15000);
+    const r=await fetch(API(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(o),signal:c.signal,cache:'no-store'});
+    clearTimeout(t); return await r.json();}
+  catch(e){return {galat:1};}
+}
+function cid(){let v=ls.get('sg_cid');if(!v){v=Array.from((window.crypto&&crypto.getRandomValues)?crypto.getRandomValues(new Uint8Array(9)):Array.from({length:9},()=>Math.random()*256|0),b=>('0'+b.toString(16)).slice(-2)).join('');ls.set('sg_cid',v);}return v;}
+async function cekSesi(){
+  if(!API()||terkunci||!tok) return;
+  const r=await panggil({a:'cek',tok:tok.tok,exp:tok.exp,ver:tok.ver});
+  if(r&&r.ok===false&&!r.galat){pesanKunci=r.pesan||'';tok=null;kunci();}
+}
+function baca(){if(API())return {api:true,auto:5};if(TETAP())return TETAP();try{return JSON.parse(ls.get(K)||'null');}catch(e){return null;}}
 async function buat(pin,auto){
   const salt=crypto.getRandomValues(new Uint8Array(16));
   const d={s:b64(salt),h:b64(await hash(pin,salt,IT)),it:IT,auto};
@@ -2226,10 +2242,10 @@ const angka=e=>{e.target.value=e.target.value.replace(/\D/g,'').slice(0,8);};
 function kunci(){
   if(!baca()||terkunci) return;
   terkunci=true; document.body.classList.add('pinlock'); clearTimeout(timer);
-  tampil(IK+'<h2 id="pinJudul">Suanggi Geotag terkunci</h2><p>Masukkan PIN untuk membuka.</p>'+
+  tampil(IK+'<h2 id="pinJudul">Suanggi Geotag terkunci</h2><p>'+(pesanKunci||'Masukkan PIN untuk membuka.')+'</p>'+
    '<input id="pIn" class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" aria-label="PIN" placeholder="••••">'+
    '<div class="perr" id="pErr" role="alert"></div><div class="pact"><button type="button" id="pOk">Buka</button></div>'+
-   '<p style="margin-top:14px;font-size:.75rem">'+(TETAP()?'Lupa PIN? Hubungi Pemilik, jang Paksa.':'Lupa PIN? Hapus data situs browser ini untuk mengatur ulang.')+'</p>');
+   '<p style="margin-top:14px;font-size:.75rem">'+(API()?'PIN berganti otomatis. Minta PIN terbaru kepada admin.':TETAP()?'Lupa PIN? Pemilik aplikasi dapat mengganti baris PIN_TETAP di index.html.':'Lupa PIN? Hapus data situs browser ini untuk mengatur ulang.')+'</p>');
   $('pIn').addEventListener('input',angka);
   $('pIn').addEventListener('keydown',e=>{if(e.key==='Enter')buka();});
   $('pOk').addEventListener('click',buka);
@@ -2249,9 +2265,17 @@ async function buka(){
   const inp=$('pIn'),er=$('pErr'); if(!inp||inp.disabled) return;
   if(inp.value.length<4){er.textContent='PIN minimal 4 angka.';return;}
   $('pOk').disabled=true;
-  let benar=false; try{benar=await cocok(inp.value);}catch(e){}
+  let benar=false, srv=null;
+  if(API()){ srv=await panggil({a:'buka',pin:inp.value,cid:cid()}); benar=!!(srv&&srv.ok); if(benar) tok=srv; }
+  else { try{benar=await cocok(inp.value);}catch(e){} }
+  if(!benar&&API()){
+    inp.value=''; $('pOk').disabled=false;
+    if(!srv||srv.galat){er.textContent='Tidak bisa menghubungi server. Periksa internet lalu coba lagi.';inp.focus();return;}
+    if(srv.jeda){gagal.set({n:5,until:Date.now()+srv.jeda*1000});jedaCek();} else {er.textContent=srv.pesan||'PIN salah.';inp.focus();}
+    return;
+  }
   if(benar){
-    gagal.reset(); terkunci=false; document.body.classList.remove('pinlock'); tutup(); mulaiTimer(); return;
+    pesanKunci=''; gagal.reset(); terkunci=false; document.body.classList.remove('pinlock'); tutup(); mulaiTimer(); return;
   }
   const g=gagal.get(); g.n=(g.n||0)+1;
   if(g.n>=5){ g.until=Date.now()+Math.min(900,15*Math.pow(2,g.n-5))*1000; }
@@ -2335,13 +2359,15 @@ function atur(){
 const ADMIN=/(^|[?&])admin(=|&|$)/.test(location.search);
 function segarUI(){const ada=!!baca();$('pinKunci').style.display=ada?'':'none';$('pinAtur').textContent=ada?'⚙️ PIN':'🔓 Pasang PIN';
   /* setelah PIN terpasang, tombol pengaturan hanya tampil bila alamat diakhiri ?admin */
-  $('pinAtur').style.display=(!ada||ADMIN)?'':'none';}
+  $('pinAtur').style.display=(!API()&&(!ada||ADMIN))?'':'none';}
 
 /* ---- kunci otomatis saat tidak aktif ---- */
 function menit(){const d=baca();return d&&d.auto?d.auto:0;}
 function mulaiTimer(){clearTimeout(timer);const m=menit();if(!m||terkunci)return;timer=setTimeout(kunci,m*60000);}
 ['pointerdown','keydown','touchstart','wheel'].forEach(ev=>addEventListener(ev,()=>{if(!terkunci&&baca()){const n=Date.now();if(n-hitung>1000){hitung=n;mulaiTimer();}}},{passive:true,capture:true}));
+setInterval(cekSesi,300000);
 document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden) cekSesi();
   if(document.hidden){tersembunyiSejak=Date.now();}
   else if(tersembunyiSejak&&baca()){const m=menit();if(m&&Date.now()-tersembunyiSejak>=m*60000)kunci();tersembunyiSejak=0;}
 });

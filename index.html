@@ -2485,7 +2485,7 @@ const DENSITY=700, MAXN=3200, MINN0=900, FLOORN=500, DPR_MAX=1.5;
 const CLEAR='rgba(2,3,10,.72)';
 const cv=document.getElementById('bg'), ctx=cv.getContext('2d',{alpha:false});
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
-let lastFrame=0,W=0,H=0,cx=0,cy=0,active=0,raf=0,last=0,tt=0,ema=16,cnt=0;
+let W=0,H=0,cx=0,cy=0,active=0,raf=0,last=0,tt=0,ema=16,cnt=0;
 let X,Y,Z,A,B,C,D;
 function alloc(n){
   X=new Float32Array(n);Y=new Float32Array(n);Z=new Float32Array(n);
@@ -2517,7 +2517,6 @@ function seg(a,b,style,w){
 function frame(ts){
   raf=requestAnimationFrame(frame);
   if(!last){last=ts;return;}
-  lastFrame=performance.now();
   const d=ts-last;
   if(d<15)return;
   last=ts;
@@ -2525,7 +2524,7 @@ function frame(ts){
   tt+=dt;
   ema+=(d-ema)*.1;
   if(++cnt>=90){cnt=0; if(ema>24&&active>FLOORN) active=Math.max(FLOORN,Math.floor(active*.8));}
-  const sp=SPEED*(1+.08*Math.sin(tt*.35))*1;
+  const sp=SPEED*(1+.08*Math.sin(tt*.35))*(reduce?.25:1);
   const vz=sp*dt, trail=sp*TRAILT;
   ctx.globalAlpha=1;ctx.fillStyle=CLEAR;ctx.fillRect(0,0,W,H);
   for(let i=0;i<active;i++){
@@ -2549,9 +2548,6 @@ function frame(ts){
 function start(){if(raf)return;last=0;raf=requestAnimationFrame(frame);}
 function stop(){if(raf){cancelAnimationFrame(raf);raf=0;}}
 document.addEventListener('visibilitychange',()=>{document.hidden?stop():start();});
-addEventListener('pageshow',()=>{if(!document.hidden){stop();start();}});
-addEventListener('pagehide',stop);
-setInterval(()=>{ if(!document.hidden&&lastFrame&&performance.now()-lastFrame>2500){stop();start();} },2000);
 let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(resize,200);});
 resize();start();
 })();

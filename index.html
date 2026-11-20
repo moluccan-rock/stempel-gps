@@ -132,8 +132,14 @@
 <body>
 <script>
 /* PIN PERMANEN: ganti null di bawah dengan baris yang dibuat tombol "⚙️ PIN" → agar terkunci di SEMUA browser/tautan. */
-window.PIN_TETAP={"s":"d/myFNeZMn7/MoUezLwoKw==","h":"7Wc4pxtKc36N8z4XRjLSZDS4HlZ4mZ1bENZ6vABMfTY=","it":200000,"auto":5};
-try{if(window.PIN_TETAP||localStorage.getItem('sg_pin'))document.body.classList.add('pinlock')}catch(e){if(window.PIN_TETAP)document.body.classList.add('pinlock')}
+window.PIN_TETAP=null;
+/* PIN OTOMATIS: isi dengan alamat Web App Apps Script (https://script.google.com/macros/s/.../exec) agar PIN berganti otomatis & dikirim ke email admin. */
+window.PIN_API="https://script.google.com/macros/s/AKfycbzns9_3gHPNQAC3JJWcv9NXpx1tH2Ceej5NZwhtdhg061hF28SJXaCM3ABkWBwTvWD9/exec";
+/* Kunci publik untuk memeriksa tanda tangan dari jalur "Masuk lewat halaman Google" (aman dipublikasikan). */
+window.PIN_PUB={"kty":"RSA","n":"6xVN13X0gqogGxr_RrGRRxSN7cRFSIDCJ8y6u7gCZTdBLtVdi50GPd7NJXOdjs5WKVbSOCgkVlnyyp8caX7n3ok-xUaJp9ey7QUPr13RnEGl7aSvCjPAkeyoAqlxyocTB5uW9cEnvqPxYp4CWHVrpkVkZ6AetBNPdDtZWgevu6IgEGFFou70RYILDFHbVH6Joernsbu2OrKw2z4J9eW3pNtF3WwKO7gjNZO8smYN5ciGBCzt-tHrZ-4T--a2-kqSDRL6vNVS7sx2EwACHWQozz49jaQk3FI2ITb43WoXcNsWsztHA-_lZb05IF19x1WDZg_6cHzcucWwhoheE_8xwQ","e":"AQAB","alg":"RS256","ext":true};
+/* KODE HARIAN OFFLINE: tempel baris window.PIN_RANTAI=... dari email di sini (menggantikan null). Tanpa server, tanpa deploy. */
+window.PIN_RANTAI=null;
+try{if(window.PIN_RANTAI||window.PIN_API||window.PIN_TETAP||localStorage.getItem('sg_pin'))document.body.classList.add('pinlock')}catch(e){if(window.PIN_RANTAI||window.PIN_API||window.PIN_TETAP)document.body.classList.add('pinlock')}
 </script>
 <canvas id="bg" aria-hidden="true"></canvas>
 <div id="pinLock" role="dialog" aria-modal="true" aria-labelledby="pinJudul"></div>
@@ -2204,7 +2210,93 @@ async function hash(pin,salt,it){
 }
 function sama(a,b){let d=a.length^b.length;for(let i=0;i<a.length&&i<b.length;i++)d|=a[i]^b[i];return d===0;}
 const TETAP=()=>window.PIN_TETAP||null;
-function baca(){if(TETAP())return TETAP();try{return JSON.parse(ls.get(K)||'null');}catch(e){return null;}}
+const RANTAI=()=>window.PIN_RANTAI||null;
+const API=()=>RANTAI()?null:(window.PIN_API||null);
+let tok=null, pesanKunci='', pesanHash='', pinKetik='', pinTerakhir='';
+async function panggilPost(o){
+  let st='';
+  try{const c=new AbortController(),t=setTimeout(()=>c.abort(),30000);
+    const r=await fetch(API(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(o),signal:c.signal});
+    clearTimeout(t); st=r.status;
+    const tx=await r.text(); let j;
+    try{j=JSON.parse(tx);}catch(e){return {galat:1,rinci:'balasan bukan JSON (status '+st+(/accounts\.google|signin|login/i.test(tx)?', diminta login Google → akses deployment harus "Anyone"':/<html/i.test(tx)?', halaman error dari Google':'')+')'};}
+    if(j&&j.galat) j.rinci='error di server: '+(j.err||'tidak diketahui');
+    return j;}
+  catch(e){return {galat:1,rinci:e&&e.name==='AbortError'?'waktu habis (30 dtk)':'permintaan diblokir browser/jaringan ('+((e&&e.message)||e)+')'};}
+}
+function jsonp(o){
+  return new Promise(res=>{
+    const cb='__sg'+Math.random().toString(36).slice(2,10), sc=document.createElement('script'); let sudah=false, t=0;
+    const fin=r=>{if(sudah)return;sudah=true;clearTimeout(t);try{delete window[cb];}catch(e){window[cb]=undefined;}sc.remove();res(r);};
+    window[cb]=d=>fin(d&&typeof d==='object'?d:{galat:1,rinci:'balasan JSONP tidak valid'});
+    sc.onerror=()=>fin({galat:1,rinci:'skrip dari server diblokir browser/ekstensi/jaringan'});
+    const qs=Object.keys(o).map(k=>encodeURIComponent(k)+'='+encodeURIComponent(o[k])).join('&');
+    sc.src=API()+(API().indexOf('?')<0?'?':'&')+qs+'&cb='+cb+'&_='+Date.now();
+    t=setTimeout(()=>fin({galat:1,rinci:'waktu habis (JSONP)'}),30000);
+    document.head.appendChild(sc);
+  });
+}
+async function panggil(o){
+  const r=await panggilPost(o);
+  if(r&&r.galat&&!r.err){                      // POST gagal sebelum sampai server → coba jalur cadangan
+    const r2=await jsonp(o);
+    if(r2&&!r2.galat) return r2;
+    r2.rinci='POST: '+(r.rinci||'gagal')+' | cadangan: '+(r2.rinci||'gagal'); return r2;
+  }
+  return r;
+}
+const dariB64u=t=>{t=t.replace(/-/g,'+').replace(/_/g,'/');while(t.length%4)t+='=';const b=atob(t),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u;};
+async function verifSg(str){                    // periksa tanda tangan RSA tanpa internet
+  try{
+    if(!window.PIN_PUB||!(window.crypto&&crypto.subtle)) return false;
+    const p=String(str).split('.'); if(p.length!==3) return false;
+    const ver=p[0], exp=Number(p[1]); if(!(exp>Date.now())) return false;
+    const key=await crypto.subtle.importKey('jwk',window.PIN_PUB,{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['verify']);
+    return await crypto.subtle.verify('RSASSA-PKCS1-v1_5',key,dariB64u(p[2]),new TextEncoder().encode(ver+'.'+p[1]));
+  }catch(e){return false;}
+}
+function masukGoogle(){                         // pindah halaman penuh ke Apps Script (tak bisa diblokir seperti fetch)
+  const pin=($('pIn')&&$('pIn').value)||pinTerakhir||'';
+  const er=$('pErr'); if(!/^\d{4,8}$/.test(pin)){er.textContent='Isi PIN dulu (4–8 angka), lalu ketuk lagi.';return;}
+  const f=document.createElement('form'); f.method='POST'; f.action=API(); f.style.display='none';
+  const set=(n,v)=>{const i=document.createElement('input');i.type='hidden';i.name=n;i.value=v;f.appendChild(i);};
+  set('a','masuk'); set('pin',pin); set('cid',cid()); set('balik',location.href.split('#')[0]);
+  document.body.appendChild(f); f.submit();
+}
+async function bacaHash(){                      // hasil kembali dari halaman Google
+  const h=location.hash||''; let ok=false;
+  if(/^#sg=/.test(h)){ ok=await verifSg(h.slice(4)); if(!ok) pesanHash='Tanda masuk tidak valid atau sudah kedaluwarsa. Masukkan PIN lagi.'; }
+  else if(/^#gagal=/.test(h)){ try{pesanHash=decodeURIComponent(h.slice(7));}catch(e){pesanHash='PIN salah.';} }
+  else return false;
+  try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
+  return ok;
+}
+/* ---- kode harian offline (rantai hash satu arah) ---- */
+const AL='0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+function enc50(b){let o='';for(let j=0;j<10;j++){const p=5*j,i=p>>3,off=p&7;o+=AL.charAt((((b[i]<<8)|(b[i+1]||0))>>(11-off))&31);}return o;}
+async function f50(x){return enc50(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('SG1:'+x))));}
+async function rantaiOk(masuk){                  // true | 'salah' | 'tanggal' | 'browser'
+  const R=RANTAI(); if(!(window.crypto&&crypto.subtle)) return 'browser';
+  let x=String(masuk).toUpperCase().replace(/[^0-9A-Z]/g,'').replace(/O/g,'0').replace(/[IL]/g,'1');
+  if(x.length!==10||/[^0-9A-HJKMNP-TV-Z]/.test(x)) return 'salah';
+  const t=Math.floor((Date.now()+R.o*3600000)/86400000)-R.d0;
+  if(t<0||t>=R.n) return 'tanggal';
+  for(let k=0;k<=t;k++) x=await f50(x);
+  return x===R.a?true:'salah';
+}
+function siapkanRantai(){
+  const e=$('pIn'); if(!e) return;
+  e.type='text'; e.removeAttribute('inputmode'); e.maxLength=14; e.placeholder='XXXXX-XXXXX';
+  e.setAttribute('autocapitalize','characters'); e.setAttribute('autocorrect','off'); e.spellcheck=false;
+  e.style.letterSpacing='.08em'; e.style.fontSize='1.25rem'; e.style.textTransform='uppercase';
+}
+function cid(){let v=ls.get('sg_cid');if(!v){v=Array.from((window.crypto&&crypto.getRandomValues)?crypto.getRandomValues(new Uint8Array(9)):Array.from({length:9},()=>Math.random()*256|0),b=>('0'+b.toString(16)).slice(-2)).join('');ls.set('sg_cid',v);}return v;}
+async function cekSesi(){
+  if(!API()||terkunci||!tok) return;
+  const r=await panggil({a:'cek',tok:tok.tok,exp:tok.exp,ver:tok.ver});
+  if(r&&r.ok===false&&!r.galat){pesanKunci=r.pesan||'';tok=null;kunci();}
+}
+function baca(){if(RANTAI())return {rantai:true,auto:5};if(API())return {api:true,auto:5};if(TETAP())return TETAP();try{return JSON.parse(ls.get(K)||'null');}catch(e){return null;}}
 async function buat(pin,auto){
   const salt=crypto.getRandomValues(new Uint8Array(16));
   const d={s:b64(salt),h:b64(await hash(pin,salt,IT)),it:IT,auto};
@@ -2220,20 +2312,24 @@ function tutup(){box.classList.remove('show');box.innerHTML='';}
 const IK='<svg class="pico" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
 const AUTO='<label for="pAuto">Kunci otomatis bila tidak dipakai</label><select id="pAuto"><option value="0">Tidak (hanya manual)</option><option value="1">1 menit</option><option value="5" selected>5 menit</option><option value="15">15 menit</option><option value="60">1 jam</option></select>';
 function fokus(id){setTimeout(()=>{const e=$(id);if(e)e.focus();},30);}
-const angka=e=>{e.target.value=e.target.value.replace(/\D/g,'').slice(0,8);};
+const angka=e=>{if(RANTAI())return;e.target.value=e.target.value.replace(/\D/g,'').slice(0,8);};
 
 /* ---- layar kunci ---- */
 function kunci(){
   if(!baca()||terkunci) return;
   terkunci=true; document.body.classList.add('pinlock'); clearTimeout(timer);
-  tampil(IK+'<h2 id="pinJudul">Suanggi Geotag terkunci</h2><p>Masukkan PIN untuk membuka.</p>'+
+  tampil(IK+'<h2 id="pinJudul">Suanggi Geotag terkunci</h2><p>'+(pesanKunci||'Masukkan PIN untuk membuka.')+'</p>'+
    '<input id="pIn" class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" aria-label="PIN" placeholder="••••">'+
    '<div class="perr" id="pErr" role="alert"></div><div class="pact"><button type="button" id="pOk">Buka</button></div>'+
-   '<p style="margin-top:14px;font-size:.75rem">'+(TETAP()?'Lupa PIN? Hubungi Pemilik, jang Paksa.':'Lupa PIN? Hapus data situs browser ini untuk mengatur ulang.')+'</p>');
+   '<div class="pact" id="pGWrap" style="display:none"><button type="button" class="sec" id="pGoogle">Masuk lewat halaman Google</button></div>'+
+   '<p style="margin-top:14px;font-size:.75rem">'+(RANTAI()?'Kode berganti tiap hari pukul 05.00. Minta kode terbaru kepada admin.':API()?'PIN berganti otomatis. Minta PIN terbaru kepada admin.':TETAP()?'Lupa PIN? Pemilik aplikasi dapat mengganti baris PIN_TETAP di index.html.':'Lupa PIN? Hapus data situs browser ini untuk mengatur ulang.')+'</p>');
   $('pIn').addEventListener('input',angka);
   $('pIn').addEventListener('keydown',e=>{if(e.key==='Enter')buka();});
   $('pOk').addEventListener('click',buka);
+  $('pGoogle').addEventListener('click',masukGoogle);
+  if(RANTAI()){siapkanRantai();$('pinJudul').nextElementSibling.textContent=pesanKunci||'Masukkan kode harian dari email admin.';}
   jedaCek(); fokus('pIn');
+  if(pesanHash){$('pErr').textContent=pesanHash;pesanHash='';}
 }
 let tick=0;
 function jedaCek(){
@@ -2247,11 +2343,31 @@ function jedaCek(){
 }
 async function buka(){
   const inp=$('pIn'),er=$('pErr'); if(!inp||inp.disabled) return;
-  if(inp.value.length<4){er.textContent='PIN minimal 4 angka.';return;}
+  if(inp.value.length<(RANTAI()?10:4)){er.textContent=RANTAI()?'Kode harian terdiri dari 10 huruf/angka.':'PIN minimal 4 angka.';return;}
   $('pOk').disabled=true;
-  let benar=false; try{benar=await cocok(inp.value);}catch(e){}
+  let benar=false, srv=null;
+  if(API()&&window.PIN_PUB&&ls.get('sg_jalur')==='google'&&/^\d{4,8}$/.test(inp.value)){ er.textContent='Membuka halaman Google…'; masukGoogle(); return; }
+  pinKetik=inp.value;
+  if(RANTAI()){
+    const rr=await rantaiOk(inp.value); benar=rr===true;
+    if(rr==='tanggal'||rr==='browser'){er.textContent=rr==='tanggal'?'Tanggal/jam perangkat tidak sesuai, atau masa berlaku kode habis. Hubungi admin.':'Browser tidak mendukung (buka lewat alamat https://).';$('pOk').disabled=false;return;}
+  }
+  else if(API()){ srv=await panggil({a:'buka',pin:inp.value,cid:cid()}); benar=!!(srv&&srv.ok); if(benar) tok=srv; }
+  else { try{benar=await cocok(inp.value);}catch(e){} }
+  if(!benar&&API()){
+    inp.value=''; $('pOk').disabled=false;
+    if(!srv||srv.galat){er.textContent='Tidak bisa menghubungi server. Periksa internet lalu coba lagi.'+(srv&&srv.rinci?' [Kode: '+srv.rinci+']':'');
+      if(window.PIN_PUB){
+        $('pGWrap').style.display='flex';pinTerakhir=pinKetik;inp.value=pinKetik;
+        if(!(srv&&srv.err)&&navigator.onLine!==false&&/^\d{4,8}$/.test(pinKetik)){er.style.color='var(--muted)';er.textContent='Jalur langsung diblokir browser. Memindahkan ke halaman Google…';setTimeout(masukGoogle,700);}
+        else er.textContent+=' Ketuk "Masuk lewat halaman Google" (PIN yang sama).';
+      }
+      inp.focus();return;}
+    if(srv.jeda){gagal.set({n:5,until:Date.now()+srv.jeda*1000});jedaCek();} else {er.textContent=srv.pesan||'PIN salah.';inp.focus();}
+    return;
+  }
   if(benar){
-    gagal.reset(); terkunci=false; document.body.classList.remove('pinlock'); tutup(); mulaiTimer(); return;
+    pesanKunci=''; gagal.reset(); terkunci=false; document.body.classList.remove('pinlock'); tutup(); mulaiTimer(); return;
   }
   const g=gagal.get(); g.n=(g.n||0)+1;
   if(g.n>=5){ g.until=Date.now()+Math.min(900,15*Math.pow(2,g.n-5))*1000; }
@@ -2335,13 +2451,15 @@ function atur(){
 const ADMIN=/(^|[?&])admin(=|&|$)/.test(location.search);
 function segarUI(){const ada=!!baca();$('pinKunci').style.display=ada?'':'none';$('pinAtur').textContent=ada?'⚙️ PIN':'🔓 Pasang PIN';
   /* setelah PIN terpasang, tombol pengaturan hanya tampil bila alamat diakhiri ?admin */
-  $('pinAtur').style.display=(!ada||ADMIN)?'':'none';}
+  $('pinAtur').style.display=(!API()&&!RANTAI()&&(!ada||ADMIN))?'':'none';}
 
 /* ---- kunci otomatis saat tidak aktif ---- */
 function menit(){const d=baca();return d&&d.auto?d.auto:0;}
 function mulaiTimer(){clearTimeout(timer);const m=menit();if(!m||terkunci)return;timer=setTimeout(kunci,m*60000);}
 ['pointerdown','keydown','touchstart','wheel'].forEach(ev=>addEventListener(ev,()=>{if(!terkunci&&baca()){const n=Date.now();if(n-hitung>1000){hitung=n;mulaiTimer();}}},{passive:true,capture:true}));
+setInterval(cekSesi,300000);
 document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden) cekSesi();
   if(document.hidden){tersembunyiSejak=Date.now();}
   else if(tersembunyiSejak&&baca()){const m=menit();if(m&&Date.now()-tersembunyiSejak>=m*60000)kunci();tersembunyiSejak=0;}
 });
@@ -2349,7 +2467,12 @@ document.addEventListener('visibilitychange',()=>{
 $('pinKunci').addEventListener('click',kunci);
 $('pinAtur').addEventListener('click',atur);
 segarUI();
-if(baca()){terkunci=false;kunci();}
+if(baca()){terkunci=false;kunci();
+  bacaHash().then(ok=>{
+    if(ok){ls.set('sg_jalur','google');pesanKunci='';gagal.reset();terkunci=false;document.body.classList.remove('pinlock');tutup();mulaiTimer();}
+    else if(pesanHash&&$('pErr')){$('pErr').textContent=pesanHash;pesanHash='';}
+  });
+}
 window.__pin={kunci,atur,baca};
 })();
 </script>

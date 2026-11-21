@@ -253,6 +253,10 @@ try{if(window.PIN_RANTAI||window.PIN_API||window.PIN_TETAP||localStorage.getItem
 
 <section class="card" aria-labelledby="h-hasil">
  <h2 id="h-hasil">5 · Hasil</h2>
+ <label class="chk" style="margin-top:0">
+  <input type="checkbox" id="pakaiStempel" checked>
+  <span><b>Gambar stempel geotag di foto</b> (peta + alamat + koordinat + waktu). Matikan bila ingin foto <b>bersih tanpa stempel</b> — metadata EXIF (GPS, waktu, kamera) tetap diisi sesuai form.</span>
+ </label>
  <div class="row" style="margin-top:4px">
   <div><label for="resizeMode">Ukuran foto (lebar px)</label>
    <select id="resizeMode" onchange="toggleResizeCustom()">
@@ -980,7 +984,8 @@ async function render(){
   const hari=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][new Date(w.Y,w.M-1,w.D).getDay()];
   const waktu=`${hari}, ${two(w.D)}/${two(w.M)}/${w.Y} ${w.h%12||12}:${two(w.mi)} ${w.h>=12?'PM':'AM'} ${w.zona}`;
 
-  const peta=await buatPeta(k.lat,k.lng,+$('zoom').value,mapW,stripH);
+  const stempel=$('pakaiStempel').checked;
+  const peta=stempel?await buatPeta(k.lat,k.lng,+$('zoom').value,mapW,stripH):{ok:true,count:9};
   if(token!==renderToken) return;
 
   cv.width=W; cv.height=H; cv.style.display='block';
@@ -988,6 +993,7 @@ async function render(){
   // Bug #27: gambar foto dgn resampling bertahap (upscale/downscale mulus)
   gambarBerkualitas(c,img,W,H);
 
+  if(stempel){
   // Bug #21: Gambar peta dengan perspektif 3D (trapesium)
   if(peta.ok) draw3DMap(c, peta.off, peta.sx, peta.sy, peta.cw, peta.ch, 0, y0, mapW, stripH, 0.32);
   else{ c.fillStyle='#455A64'; c.fillRect(0,y0,mapW,stripH); }
@@ -1027,6 +1033,7 @@ async function render(){
   c.fillStyle='#2ECC40'; c.beginPath(); c.arc(bx+bh*.55,by+bh/2,bh*.16,0,7); c.fill();
   c.fillStyle='#fff'; c.font=`bold ${bh*.5}px Arial`; c.textBaseline='middle';
   c.fillText('GPS',bx+bh*.95,by+bh*.56);
+  }
 
   // Bug #19: snapshot lengkap untuk metadata
   lastMeta={
@@ -1044,7 +1051,7 @@ async function render(){
     resizeInfo                                   // Bug #27: info resize utk panel pratinjau
   };
 
-  let msg='✅ Selesai — cek preview lalu Download JPG';
+  let msg=stempel?'✅ Selesai — cek preview lalu Download JPG':'✅ Selesai (tanpa stempel di foto, metadata EXIF tetap diisi) — cek preview lalu Download JPG';
   if(!peta.ok) msg='⚠️ Peta gagal dimuat (offline / diblokir?). Stempel dibuat tanpa gambar peta.';
   else if(peta.count<9) msg+=' (sebagian tile peta gagal dimuat)';
   setStatus(msg+exifNote);
@@ -1541,7 +1548,7 @@ const jadwal=()=>{
   tmr=setTimeout(()=>{ exifNote=''; render(); },450);
 };
 // Bug #28: masukkan ukuranMode ke daftar listener supaya toggle "Naikkan ke ≈ target" me-render ulang
-['lat','lng','zoom','tgl','jam','tz','nama','alamat','note','make','model','alt','keepExif','keepImgDesc','resizeMode','resizeCustom','ukuranMode','ukuranCustom'].forEach(id=>{
+['lat','lng','zoom','tgl','jam','tz','nama','alamat','note','make','model','alt','keepExif','keepImgDesc','pakaiStempel','resizeMode','resizeCustom','ukuranMode','ukuranCustom'].forEach(id=>{
   const el=$(id);
   if(!el) return;
   el.addEventListener('input',jadwal);
@@ -2485,7 +2492,7 @@ const DENSITY=700, MAXN=3200, MINN0=900, FLOORN=500, DPR_MAX=1.5;
 const CLEAR='rgba(2,3,10,.72)';
 const cv=document.getElementById('bg'), ctx=cv.getContext('2d',{alpha:false});
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
-let W=0,H=0,cx=0,cy=0,active=0,raf=0,last=0,tt=0,ema=16,cnt=0;
+let lastFrame=0,W=0,H=0,cx=0,cy=0,active=0,raf=0,last=0,tt=0,ema=16,cnt=0;
 let X,Y,Z,A,B,C,D;
 function alloc(n){
   X=new Float32Array(n);Y=new Float32Array(n);Z=new Float32Array(n);
@@ -2517,6 +2524,7 @@ function seg(a,b,style,w){
 function frame(ts){
   raf=requestAnimationFrame(frame);
   if(!last){last=ts;return;}
+  lastFrame=performance.now();
   const d=ts-last;
   if(d<15)return;
   last=ts;
@@ -2524,7 +2532,7 @@ function frame(ts){
   tt+=dt;
   ema+=(d-ema)*.1;
   if(++cnt>=90){cnt=0; if(ema>24&&active>FLOORN) active=Math.max(FLOORN,Math.floor(active*.8));}
-  const sp=SPEED*(1+.08*Math.sin(tt*.35))*(reduce?.25:1);
+  const sp=SPEED*(1+.08*Math.sin(tt*.35))*1;
   const vz=sp*dt, trail=sp*TRAILT;
   ctx.globalAlpha=1;ctx.fillStyle=CLEAR;ctx.fillRect(0,0,W,H);
   for(let i=0;i<active;i++){
@@ -2548,6 +2556,9 @@ function frame(ts){
 function start(){if(raf)return;last=0;raf=requestAnimationFrame(frame);}
 function stop(){if(raf){cancelAnimationFrame(raf);raf=0;}}
 document.addEventListener('visibilitychange',()=>{document.hidden?stop():start();});
+addEventListener('pageshow',()=>{if(!document.hidden){stop();start();}});
+addEventListener('pagehide',stop);
+setInterval(()=>{ if(!document.hidden&&lastFrame&&performance.now()-lastFrame>2500){stop();start();} },2000);
 let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(resize,200);});
 resize();start();
 })();

@@ -169,8 +169,8 @@ try{if(window.PIN_RANTAI||window.PIN_API||window.PIN_TETAP||localStorage.getItem
 
 <section class="card" aria-labelledby="h-foto">
  <h2 id="h-foto">1 · Foto</h2>
- <label for="foto">Pilih foto (JPG / PNG / WebP)</label>
- <input type="file" id="foto" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp">
+ <label for="foto">Pilih foto (JPG / PNG / WebP / HEIC iPhone)</label>
+ <input type="file" id="foto" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif">
  <p class="hint">Jika foto punya GPS dan waktu EXIF, isian di bawah terisi otomatis. Metadata kamera asli (Make, Model, exposure) dipertahankan.</p>
 </section>
 
@@ -449,6 +449,78 @@ function bacaFullExif(file){
   });
 }
 
+/* =================== HEIC / HEIF (iPhone) -> JPEG =================== */
+const adalahHeic=f=>!!f&&(/hei[cf]/i.test(f.type||'')||/\.(heic|heif|hif)$/i.test(f.name||''));
+let _heicMuat=null;
+function muatHeic2any(){
+  if(window.heic2any) return Promise.resolve();
+  if(_heicMuat) return _heicMuat;
+  _heicMuat=new Promise((res,rej)=>{
+    const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
+    s.onload=()=>window.heic2any?res():(_heicMuat=null,rej(new Error('Pengonversi HEIC tidak termuat')));
+    s.onerror=()=>{ _heicMuat=null; rej(new Error('Gagal memuat pengonversi HEIC (periksa internet lalu coba lagi)')); };
+    document.head.appendChild(s);
+  });
+  return _heicMuat;
+}
+// Cari blok EXIF (TIFF) di dalam file HEIC; hasilnya string "Exif\0\0"+TIFF yang bisa dibaca piexif.load
+function exifDariHeic(buf){
+  const u=new Uint8Array(buf), n=u.length-12;
+  for(let i=0;i<n;i++){
+    if(u[i]===0x45&&u[i+1]===0x78&&u[i+2]===0x69&&u[i+3]===0x66&&u[i+4]===0&&u[i+5]===0){
+      const a=u[i+6], b=u[i+7];
+      if((a===0x4D&&b===0x4D&&u[i+8]===0&&u[i+9]===0x2A)||(a===0x49&&b===0x49&&u[i+8]===0x2A&&u[i+9]===0)){
+        const len=Math.min(60000,u.length-(i+6));
+        let bin='Exif\0\0';
+        const tiff=u.subarray(i+6,i+6+len); let part='';
+        for(let k=0;k<tiff.length;k+=8192) part+=String.fromCharCode.apply(null,tiff.subarray(k,k+8192));
+        return bin+part;
+      }
+    }
+  }
+  return null;
+}
+async function heicKeJpeg(file,kualitas){
+  kualitas=kualitas||0.95;
+  let blob=null;
+  if(window.createImageBitmap){            // Safari / iOS / macOS bisa membuka HEIC langsung
+    try{
+      const bm=await createImageBitmap(file,{imageOrientation:'from-image'});
+      const c=document.createElement('canvas'); c.width=bm.width; c.height=bm.height;
+      c.getContext('2d').drawImage(bm,0,0); if(bm.close) try{bm.close();}catch(e){}
+      blob=await new Promise(r=>c.toBlob(r,'image/jpeg',kualitas));
+    }catch(e){ blob=null; }
+  }
+  if(!blob||!blob.size){                   // Chrome / Firefox / Android / PC: pakai pengonversi
+    await muatHeic2any();
+    let out;
+    try{ out=await window.heic2any({blob:file,toType:'image/jpeg',quality:kualitas}); }
+    catch(e){ throw new Error('File HEIC tidak bisa dibaca (rusak / format HEIC tidak umum).'); }
+    blob=Array.isArray(out)?out[0]:out;
+  }
+  let adaExif=false;
+  try{                                     // pulihkan EXIF (GPS, waktu, kamera) dari HEIC asli
+    if(window.piexif){
+      const fake=exifDariHeic(await file.arrayBuffer());
+      if(fake){
+        const ex=piexif.load(fake);
+        ex.thumbnail=null; delete ex['1st'];
+        ex['0th']=ex['0th']||{}; ex['0th'][piexif.ImageIFD.Orientation]=1;   // gambar sudah ditegakkan
+        delete ex['0th'][piexif.ImageIFD.XResolution]; delete ex['0th'][piexif.ImageIFD.YResolution];
+        const du=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(blob);});
+        const ins=piexif.insert(piexif.dump(ex),du);
+        const bin=atob(ins.split(',')[1]), a=new Uint8Array(bin.length);
+        for(let i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i);
+        blob=new Blob([a],{type:'image/jpeg'}); adaExif=true;
+      }
+    }
+  }catch(e){}
+  const base=String(file.name||'foto').replace(/\.[^.\\/]+$/,'')||'foto';
+  const f=new File([blob],base+'.jpg',{type:'image/jpeg',lastModified:file.lastModified||Date.now()});
+  f.dariHeic=true; f.adaExif=adaExif;
+  return f;
+}
+
 async function muatGambar(file){
   if(window.createImageBitmap){
     try{ return await createImageBitmap(file,{imageOrientation:'from-image'}); }catch(e){}
@@ -462,14 +534,16 @@ async function muatGambar(file){
 }
 
 $('foto').onchange=async e=>{
-  const file=e.target.files[0];
+  let file=e.target.files[0];
   if(!file) return;
-  const nama=(file.name||'').toLowerCase(), tipe=(file.type||'').toLowerCase();
-
-  if(/heic|heif/.test(tipe)||/\.(heic|heif)$/.test(nama)){
-    setStatus('⚠️ Format HEIC/HEIF tidak didukung browser. Ubah ke JPG dulu (atau set kamera ke "Most Compatible").');
-    e.target.value=''; return;
+  let dariHeic=false;
+  if(adalahHeic(file)){
+    $('btnDl').disabled=true;
+    setStatus('⏳ Mengonversi foto HEIC/HEIF (iPhone) ke JPG...');
+    try{ file=await heicKeJpeg(file); dariHeic=true; }
+    catch(err){ setStatus('⚠️ '+err.message); e.target.value=''; return; }
   }
+  const nama=(file.name||'').toLowerCase(), tipe=(file.type||'').toLowerCase();
   const isJpeg=/jpe?g/.test(tipe)||/\.jpe?g$/.test(nama);
   if(!isJpeg && !/^image\/(png|webp)$/.test(tipe) && !/\.(png|webp)$/.test(nama)){
     setStatus('⚠️ Format file tidak didukung. Gunakan JPG, PNG, atau WebP.');
@@ -489,6 +563,7 @@ $('foto').onchange=async e=>{
   originalExif=fullExif;
 
   const catatan=[];
+  if(dariHeic) catatan.push('dikonversi dari HEIC'+(file.adaExif?', EXIF asli terbaca':', EXIF tidak ditemukan'));
   if(info&&info.lat!==undefined){
     $('lat').value=info.lat.toFixed(6); $('lng').value=info.lng.toFixed(6);
     catatan.push('koordinat dari EXIF foto');
@@ -1658,7 +1733,6 @@ async function bacaExifObj(file){
 async function kompresGambarTurun(file,target,opt,upd,batal,paksa){
   if(!paksa&&file.size<=target) return {blob:file,status:'same',nama:file.name,info:`Sudah di bawah target (${fmt(file.size)} ≤ ${fmt(target)}) — tidak diubah.`};
   const tipe=(file.type||'').toLowerCase(), nm=(file.name||'').toLowerCase();
-  if(/heic|heif/.test(tipe)||/\.(heic|heif)$/.test(nm)) throw new Error('Format HEIC/HEIF tidak didukung browser. Ubah ke JPG dulu.');
   upd('Membuka gambar…');
   const bmp=await bukaBitmap(file,false);
   const sw=bmp.naturalWidth||bmp.width, sh=bmp.naturalHeight||bmp.height;
@@ -1744,6 +1818,7 @@ async function naikGambar(file,target,opt,upd,batal){
   return {blob:out,status:'ok',nama,info:`Dinaikkan ${fmt(file.size)} → ${fmt(out.size)} (target ${fmt(target)}, ${Math.round(out.size/target*100)}%) · ${ket} · +${fmt(out.size-asal)} data pengisi tak terlihat`};
 }
 async function kompresGambar(file,target,opt,upd,batal){
+  if(adalahHeic(file)){ upd('Mengonversi HEIC → JPG…'); file=await heicKeJpeg(file); }   // HEIC (iPhone) dijadikan JPG dulu
   if(file.size===target) return {blob:file,status:'same',nama:file.name,info:`Ukuran sudah persis ${fmt(target)} — tidak diubah.`};
   if(file.size<target) return naikGambar(file,target,opt,upd,batal);
   const r=await kompresGambarTurun(file,target,opt,upd,batal,false);
@@ -2037,9 +2112,9 @@ async function kompresPdf(file,target,opt,upd,batal){
 const IKON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 12v6m0 0 3-3m-3 3-3-3"/></svg>';
 const PANEL={
   img:{id:'kzImg',p:'kzi',minKB:5,def:200,
-    accept:'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp',
-    cocok:f=>/^image\/(jpeg|png|webp)$/.test(f.type||'')||/\.(jpe?g|png|webp)$/i.test(f.name),
-    judul:'Gambar (JPG / PNG / WebP)',
+    accept:'image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif',
+    cocok:f=>/^image\/(jpeg|png|webp|heic|heif)$/.test(f.type||'')||/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name),
+    judul:'Gambar (JPG / PNG / WebP / HEIC iPhone)',
     petunjuk:'Bisa menurunkan DAN menaikkan ukuran sesuai target Anda. Hasil selalu JPG. Ukuran diukur dari file sungguhan, tidak pernah melebihi target.',
     opsi:'<label class="chk"><input type="checkbox" id="kziExif" checked><span>Pertahankan metadata EXIF (GPS, tanggal, kamera) pada foto JPG. Ukuran EXIF sudah dihitung dalam target.</span></label>'+'<label class="chk"><input type="checkbox" id="kziPad" checked><span>Pas-kan ukuran persis ke target (menambah data pengisi tak terlihat; wajib aktif untuk MENAIKKAN ukuran).</span></label>'},
   pdf:{id:'kzPdf',p:'kzp',minKB:20,def:500,
@@ -2329,7 +2404,7 @@ function kunci(){
    '<input id="pIn" class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" aria-label="PIN" placeholder="••••">'+
    '<div class="perr" id="pErr" role="alert"></div><div class="pact"><button type="button" id="pOk">Buka</button></div>'+
    '<div class="pact" id="pGWrap" style="display:none"><button type="button" class="sec" id="pGoogle">Masuk lewat halaman Google</button></div>'+
-   '<p style="margin-top:14px;font-size:.75rem">'+(RANTAI()?'Kode berganti tiap hari pukul 05.00. Minta kode terbaru kepada admin.':API()?'PIN berganti otomatis. Kepepet..?? Minta Jang Ngeyel.. Pukiee hahahahaha.':TETAP()?'Lupa PIN? Pemilik aplikasi dapat mengganti baris PIN_TETAP di index.html.':'Lupa PIN? Hapus data situs browser ini untuk mengatur ulang.')+'</p>');
+   '<p style="margin-top:14px;font-size:.75rem">'+(RANTAI()?'Kode berganti tiap hari pukul 05.00. Minta kode terbaru kepada admin.':API()?'PIN berganti otomatis. Minta PIN terbaru kepada admin.':TETAP()?'Lupa PIN? Pemilik aplikasi dapat mengganti baris PIN_TETAP di index.html.':'Lupa PIN? Hapus data situs browser ini untuk mengatur ulang.')+'</p>');
   $('pIn').addEventListener('input',angka);
   $('pIn').addEventListener('keydown',e=>{if(e.key==='Enter')buka();});
   $('pOk').addEventListener('click',buka);

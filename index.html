@@ -25,7 +25,7 @@
  }
  *{box-sizing:border-box}
  #bg{position:fixed;inset:0;width:100%;height:100%;z-index:-1;display:block}
- html{background:#02030a}
+ html{background:var(--bg)}
  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:16px;line-height:1.5;
   max-width:720px;margin:0 auto;padding:16px 16px 40px;background:var(--bg);color:var(--text)}
  header.top{margin:8px 0 16px}
@@ -112,7 +112,7 @@
  .kz-acts button{min-height:36px;padding:6px 12px;font-size:.8125rem}
  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
  /* ===== Kunci PIN ===== */
- body.pinlock>*:not(#bg):not(#pinLock):not(script){display:none!important}
+ body.pinlock>*:not(#bg):not(#wall):not(#pinLock):not(script){display:none!important}
  .pinbar{display:flex;justify-content:center;gap:8px;margin-top:10px;flex-wrap:wrap}
  .pinbar button{min-height:34px;padding:5px 12px;font-size:.8125rem}
  #pinLock{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(2,3,10,.55)}
@@ -127,7 +127,171 @@
  #pinLock .pact{display:flex;gap:10px;margin-top:14px}
  #pinLock .pact button{flex:1}
  #pinLock .pico{color:var(--primary)}
+ /* ===== TEMA TAMPILAN (dipilih admin lewat ?admin → 🎨 Tampilan) ===== */
+ #wall{position:fixed;inset:0;z-index:-1;display:none;background-size:cover;background-position:center;background-repeat:no-repeat}
+ #wall::after{content:"";position:absolute;inset:0;background:rgba(0,0,0,var(--dim,0))}
+ html.w-tema #wall,html.w-gambar #wall{display:block}
+ html.w-tema #bg,html.w-gambar #bg{display:none}
+ html.w-gambar #wall::after{background:rgba(0,0,0,var(--dim,.35))}
+ html.w-tema #wall::after{background:none}
+ html.t-x body{background:transparent}
+ /* --- Kaca --- */
+ html[data-tema=kaca]{--bg:#070b18;--surface:rgba(255,255,255,.09);--border:rgba(255,255,255,.2);--text:#eef6ff;--muted:#c4d3ea;--radius:22px;--shadow:0 10px 30px rgba(0,0,0,.25)}
+ html[data-tema=kaca] .card,html[data-tema=kaca] .tabs{backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+ html[data-tema=kaca] input,html[data-tema=kaca] select{background:rgba(255,255,255,.08);border-radius:14px}
+ html[data-tema=kaca] button{border-radius:14px}
+ html[data-tema=kaca].w-tema #wall{background:radial-gradient(520px 380px at 92% 0%,rgba(45,212,191,.42),transparent 70%),radial-gradient(480px 440px at 0% 55%,rgba(99,102,241,.42),transparent 70%),radial-gradient(460px 360px at 100% 100%,rgba(236,72,153,.26),transparent 70%),#070b18}
+ /* --- Neon Tepi --- */
+ html[data-tema=neon]{--bg:#04060c;--surface:#080e1c;--text:#e6fffb;--muted:#93b4c9;--radius:16px;--glow:#2dd4bf}
+ html[data-tema=neon] .card{border-color:var(--glow);box-shadow:0 0 0 1px rgba(255,255,255,.04),0 0 22px color-mix(in srgb,var(--glow) 35%,transparent),inset 0 0 24px color-mix(in srgb,var(--glow) 8%,transparent)}
+ html[data-tema=neon] .card:nth-of-type(3n+2){--glow:#a78bfa}
+ html[data-tema=neon] .card:nth-of-type(3n){--glow:#f472b6}
+ html[data-tema=neon] .card h2{color:var(--glow)}
+ html[data-tema=neon].w-tema #wall{background:#04060c}
+ /* --- Lembut Timbul --- */
+ html[data-tema=lembut]{--bg:#161b26;--surface:#161b26;--border:transparent;--radius:26px;--shadow:10px 10px 22px #0e121a,-10px -10px 22px #1e2533;--text:#e4ebf5;--muted:#9fb0c8}
+ html[data-tema=lembut] input,html[data-tema=lembut] select{border:0;border-radius:16px;box-shadow:inset 4px 4px 9px #0e121a,inset -4px -4px 9px #1e2533}
+ html[data-tema=lembut] .tabs{box-shadow:inset 4px 4px 9px #0e121a,inset -4px -4px 9px #1e2533;border:0}
+ html[data-tema=lembut] button:not(.tab){border-radius:16px;box-shadow:5px 5px 11px #0e121a,-5px -5px 11px #1e2533}
+ html[data-tema=lembut].w-tema #wall{background:#161b26}
+ /* --- Bento --- */
+ html[data-tema=bento]{--bg:#0a0d14;--surface:#131826;--border:#1e2740;--radius:28px;--shadow:none;--text:#f1f5f9;--muted:#9aa8c2}
+ html[data-tema=bento] .kol:first-child>.card:nth-of-type(1){background:linear-gradient(150deg,#134e4a,#0f2a33);border-color:transparent;--surface:rgba(0,0,0,.25);--muted:#a7d8d2}
+ html[data-tema=bento] .kol:first-child>.card:nth-of-type(3){background:#1a1530;border-color:transparent}
+ html[data-tema=bento] .kol:first-child>.card:nth-of-type(4){background:#2a1626;border-color:transparent}
+ html[data-tema=bento] .kol:last-child>.card:nth-of-type(1){background:#f1f5f9;border-color:transparent;--text:#0a0d14;--muted:#475569;--surface:#fff;--border:#cbd5e1;--primary:#0f766e;--primary-h:#115e59;--primary-fg:#fff;--info-bg:#e6f4ef;--info-bd:#9fd3c4}
+ html[data-tema=bento] input,html[data-tema=bento] select{border-radius:16px}
+ html[data-tema=bento] button{border-radius:16px}
+ html[data-tema=bento].w-tema #wall{background:#0a0d14}
+ /* --- Rel Langkah --- */
+ html[data-tema=langkah]{--bg:#0b1120;--surface:#111a2f;--border:#1f2c4a;--radius:18px;--text:#e8eef9;--muted:#94a3bd;--shadow:none}
+ html[data-tema=langkah] .kol{position:relative;padding-left:54px;counter-reset:k}
+ html[data-tema=langkah] .kol::before{content:"";position:absolute;left:19px;top:20px;bottom:20px;width:2px;background:linear-gradient(#2dd4bf,#6366f1 55%,#f472b6)}
+ html[data-tema=langkah] .kol>.card{position:relative;counter-increment:k}
+ html[data-tema=langkah] .kol>.card::before{content:counter(k);position:absolute;left:-54px;top:8px;width:40px;height:40px;border-radius:50%;background:var(--primary);color:var(--primary-fg);font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 6px #0b1120}
+ html[data-tema=langkah].w-tema #wall{background:#0b1120}
+ /* --- Kertas Terang --- */
+ html[data-tema=kertas]{--bg:#f3efe7;--surface:#fffdf8;--text:#1c1f26;--muted:#5b616e;--border:#e4dccb;--primary:#0f766e;--primary-h:#115e59;--primary-fg:#fff;--neutral:#5b616e;--neutral-h:#3f4552;--success:#16a34a;--success-h:#22c55e;--info-bg:#e6f4ef;--info-bd:#9fd3c4;--warn-bg:#fff4e0;--warn-bd:#e5b66a;--radius:20px;--shadow:0 10px 24px rgba(60,44,10,.08);--focus:#1d4ed8}
+ html[data-tema=kertas] header.top h1,html[data-tema=kertas] .card h2{font-family:Georgia,"Times New Roman",serif}
+ html[data-tema=kertas].w-tema #wall{background:#f3efe7}
+ /* --- HUD Antariksa --- */
+ html[data-tema=hud]{--bg:#03060c;--surface:rgba(6,14,26,.92);--border:#1d4e4a;--text:#d7f5ee;--muted:#8fb9b3;--radius:0;--shadow:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+ html[data-tema=hud] body{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+ html[data-tema=hud] button,html[data-tema=hud] input,html[data-tema=hud] select,html[data-tema=hud] .kz-drop,html[data-tema=hud] .kz-item,html[data-tema=hud] .tabs,html[data-tema=hud] .tab,html[data-tema=hud] .subtab{border-radius:0}
+ html[data-tema=hud] .card{background-color:var(--surface);background-image:linear-gradient(#2dd4bf,#2dd4bf),linear-gradient(#2dd4bf,#2dd4bf),linear-gradient(#2dd4bf,#2dd4bf),linear-gradient(#2dd4bf,#2dd4bf),linear-gradient(#2dd4bf,#2dd4bf),linear-gradient(#2dd4bf,#2dd4bf),linear-gradient(#2dd4bf,#2dd4bf),linear-gradient(#2dd4bf,#2dd4bf);background-repeat:no-repeat;background-size:16px 2px,2px 16px,16px 2px,2px 16px,16px 2px,2px 16px,16px 2px,2px 16px;background-position:left top,left top,right top,right top,left bottom,left bottom,right bottom,right bottom}
+ html[data-tema=hud] .card h2::before{content:"// "}
+ html[data-tema=hud].w-tema #wall{background-color:#03060c;background-image:linear-gradient(rgba(45,212,191,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(45,212,191,.06) 1px,transparent 1px);background-size:24px 24px}
+ /* --- Aurora Gradien --- */
+ html[data-tema=aurora]{--bg:#0a0b1a;--surface:#10122a;--text:#f2f0ff;--muted:#a3a8d0;--border:#2f3466;--primary:#8b5cf6;--primary-h:#a78bfa;--primary-fg:#fff;--radius:22px;--shadow:none}
+ html[data-tema=aurora] .card{border:1.5px solid transparent;background:linear-gradient(var(--surface),var(--surface)) padding-box,linear-gradient(135deg,#8b5cf6,#2dd4bf 55%,#f472b6) border-box}
+ html[data-tema=aurora] #btnBuat,html[data-tema=aurora] .tab.active,html[data-tema=aurora] .subtab.active{background:linear-gradient(90deg,#8b5cf6,#ec4899);color:#fff}
+ html[data-tema=aurora].w-tema #wall{background:radial-gradient(480px 340px at 15% 0%,rgba(139,92,246,.35),transparent 70%),radial-gradient(480px 340px at 100% 40%,rgba(45,212,191,.22),transparent 70%),#0a0b1a}
+ /* --- Senja Hangat --- */
+ html[data-tema=senja]{--bg:#1b1030;--surface:rgba(20,8,32,.6);--border:rgba(253,186,140,.28);--text:#fff4ec;--muted:#fdd6c4;--primary:#fdba74;--primary-h:#fde68a;--primary-fg:#3b0f1c;--radius:24px;--shadow:none}
+ html[data-tema=senja].w-tema #wall{background:linear-gradient(180deg,#1b1030 0%,#3a1546 38%,#7a2a4a 72%,#c2563f 100%)}
+ /* --- Peta Topografi --- */
+ html[data-tema=topo]{--bg:#0f1a14;--surface:#16251c;--border:#2c4636;--text:#e8f0e4;--muted:#a5c2a8;--primary:#86efac;--primary-h:#bbf7d0;--primary-fg:#062012;--radius:6px;--shadow:none}
+ html[data-tema=topo] .card{border-radius:6px 26px 6px 26px}
+ html[data-tema=topo] .card:nth-of-type(even){border-radius:26px 6px 26px 6px}
+ html[data-tema=topo] input,html[data-tema=topo] select,html[data-tema=topo] button{border-radius:4px 14px 4px 14px}
+ html[data-tema=topo].w-tema #wall{background-color:#0f1a14;background-image:repeating-radial-gradient(circle at 12% 18%,transparent 0 30px,rgba(134,239,172,.07) 30px 31px),repeating-radial-gradient(circle at 88% 85%,transparent 0 38px,rgba(134,239,172,.06) 38px 39px)}
+ /* --- Polaroid --- */
+ html[data-tema=polaroid]{--bg:#2b2a33;--surface:#fbf8f2;--text:#2a2622;--muted:#5f574d;--border:#e4dccb;--primary:#0f766e;--primary-h:#115e59;--primary-fg:#fff;--neutral:#5f574d;--neutral-h:#3f3a33;--success:#16a34a;--success-h:#22c55e;--info-bg:#e6f4ef;--info-bd:#9fd3c4;--warn-bg:#fff4e0;--warn-bd:#e5b66a;--radius:4px;--shadow:0 14px 28px rgba(0,0,0,.45);--focus:#1d4ed8}
+ html[data-tema=polaroid] header.top h1{color:#f5efe6} html[data-tema=polaroid] header.top p{color:#d9d2c6}
+ html[data-tema=polaroid] .card{position:relative}
+ html[data-tema=polaroid] .card:nth-of-type(odd){transform:rotate(-.7deg)}
+ html[data-tema=polaroid] .card:nth-of-type(even){transform:rotate(.5deg)}
+ html[data-tema=polaroid] .card::before{content:"";position:absolute;top:-11px;left:50%;width:84px;height:22px;margin-left:-42px;background:rgba(252,211,77,.75);transform:rotate(2deg)}
+ html[data-tema=polaroid] .card:nth-of-type(even)::before{background:rgba(244,114,182,.7);transform:rotate(-3deg)}
+ html[data-tema=polaroid].w-tema #wall{background-color:#2b2a33;background-image:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1px);background-size:18px 18px}
+ /* --- Neo-Brutal --- */
+ html[data-tema=brutal]{--bg:#fff7d6;--surface:#fff;--text:#111;--muted:#333;--border:#111;--primary:#fde047;--primary-h:#facc15;--primary-fg:#111;--neutral:#111;--neutral-h:#333;--success:#a7f3d0;--success-h:#6ee7b7;--info-bg:#e0f2fe;--info-bd:#111;--warn-bg:#ffedd5;--warn-bd:#111;--radius:0;--shadow:7px 7px 0 #111;--focus:#1d4ed8}
+ html[data-tema=brutal] header.top h1{font-weight:900}
+ html[data-tema=brutal] .card{border:3px solid #111}
+ html[data-tema=brutal] .kol>.card:nth-of-type(1){background:#c4f1f9}
+ html[data-tema=brutal] .kol>.card:nth-of-type(2){background:#fecdd3}
+ html[data-tema=brutal] .kol>.card:nth-of-type(3){background:#fef08a}
+ html[data-tema=brutal] .kol>.card:nth-of-type(4){background:#e9d5ff}
+ html[data-tema=brutal] .kol:last-child>.card:nth-of-type(1){background:#d9f99d}
+ html[data-tema=brutal] input,html[data-tema=brutal] select{background:#fff;border:3px solid #111;border-radius:0}
+ html[data-tema=brutal] button{border:3px solid #111;border-radius:0;box-shadow:3px 3px 0 #111;color:#111}
+ html[data-tema=brutal] button.sec{background:#fff;color:#111}
+ html[data-tema=brutal] .tabs{border:3px solid #111;border-radius:0;box-shadow:4px 4px 0 #111}
+ html[data-tema=brutal] .tab{box-shadow:none;border:0}
+ html[data-tema=brutal] .tab.active{background:#111;color:#fff}
+ html[data-tema=brutal] .kz-drop,html[data-tema=brutal] .kz-item,html[data-tema=brutal] .subtab{border-radius:0}
+ html[data-tema=brutal].w-tema #wall{background:#fff7d6}
+ /* tema terang: warna status & komponen yang tadinya untuk latar gelap */
+ html[data-tema=kertas] .kz-ok,html[data-tema=polaroid] .kz-ok,html[data-tema=brutal] .kz-ok{color:#15803d}
+ html[data-tema=kertas] .kz-warn,html[data-tema=polaroid] .kz-warn,html[data-tema=brutal] .kz-warn{color:#b45309}
+ html[data-tema=kertas] .kz-err,html[data-tema=polaroid] .kz-err,html[data-tema=brutal] .kz-err{color:#b91c1c}
+ html[data-tema=kertas] .kz-run,html[data-tema=polaroid] .kz-run,html[data-tema=brutal] .kz-run{color:#0f766e}
+ html[data-tema=kertas] .warn strong,html[data-tema=polaroid] .warn strong,html[data-tema=brutal] .warn strong{color:#b45309}
+ html[data-tema=kertas] .kz-bar,html[data-tema=polaroid] .kz-bar,html[data-tema=brutal] .kz-bar{background:rgba(0,0,0,.12)}
+ html[data-tema=kertas] .kz-item,html[data-tema=polaroid] .kz-item,html[data-tema=brutal] .kz-item{background:rgba(0,0,0,.03)}
+ html[data-tema=kertas] .tab:hover,html[data-tema=polaroid] .tab:hover,html[data-tema=brutal] .tab:hover,html[data-tema=kertas] .subtab:hover,html[data-tema=polaroid] .subtab:hover,html[data-tema=brutal] .subtab:hover{background:rgba(0,0,0,.06)}
+ html[data-tema=kertas] .kz-drop,html[data-tema=polaroid] .kz-drop{background:rgba(15,118,110,.07);border-color:#0f766e}
+ html[data-tema=kertas] .kz-drop svg,html[data-tema=polaroid] .kz-drop svg{color:#0f766e}
+ html[data-tema=brutal] .kz-drop{background:#fff;border-color:#111}
+ html[data-tema=brutal] .kz-drop svg{color:#111}
+ /* ===== Tata letak desktop: 2 kolom ===== */
+ .kol{min-width:0}
+ @media (min-width:1000px){
+  body{max-width:1120px}
+  #tabFoto{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 18px;align-items:start}
+  #tabKompres{max-width:760px;margin:0 auto}
+  header.top{text-align:left}
+  .tabs{max-width:560px}
+ }
+ /* ===== Panel admin Tampilan ===== */
+ #temaBox{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:14px;background:rgba(0,0,0,.6)}
+ #temaBox.show{display:flex}
+ #temaBox .tbox{width:100%;max-width:640px;max-height:92vh;overflow:auto;background:#101827;color:#e5e9f0;border:1px solid #2a3850;border-radius:16px;padding:18px 18px 16px;box-shadow:0 10px 40px rgba(0,0,0,.6);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+ #temaBox h2{margin:0 0 4px;font-size:1.1rem} #temaBox h3{margin:16px 0 8px;font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:#a3afc2}
+ #temaBox p{margin:0 0 8px;font-size:.8125rem;color:#a3afc2}
+ #temaBox .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px}
+ #temaBox .topt{display:flex;flex-direction:column;align-items:stretch;gap:6px;min-height:64px;padding:8px;background:#0b1220;color:#e5e9f0;border:2px solid #2a3850;border-radius:12px;text-align:left;font-weight:600;font-size:.8125rem}
+ #temaBox .topt:hover{background:#142036} #temaBox .topt[aria-pressed=true]{border-color:#2dd4bf;background:#0d2a24}
+ #temaBox .tsw{display:flex;gap:4px;height:14px} #temaBox .tsw i{flex:1;border-radius:4px}
+ #temaBox .trow{display:flex;flex-wrap:wrap;gap:8px} #temaBox .trow label{display:flex;align-items:center;gap:6px;margin:0;font-weight:500;font-size:.875rem}
+ #temaBox .trow input[type=radio]{width:auto;min-height:auto}
+ #temaBox input[type=range]{width:100%;min-height:34px;padding:0;background:transparent;border:0}
+ #temaBox input[type=file]{font-size:.8125rem;min-height:40px}
+ #temaBox .tprev{width:100%;height:90px;border-radius:10px;border:1px solid #2a3850;background:#0b1220 center/cover no-repeat;margin:8px 0}
+ #temaBox .tact{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+ #temaBox .tact button{flex:1;min-width:150px}
+ #temaBox .tmsg{min-height:1.3em;margin-top:8px;font-size:.8125rem;color:#86efac}
+ body.pinlock>#temaBox{display:none!important}
+ #temaBox label{color:#e5e9f0;margin:0}
+ #temaBox .topt span{color:#e5e9f0}
 </style>
+<script>
+/* TEMA DEFAULT: diisi otomatis oleh tombol "Simpan jadi default" di panel 🎨 Tampilan (?admin). */
+window.TEMA_DEFAULT=null;/*TEMA_DEFAULT*/
+window.TEMA_LIST=[['klasik','Klasik (bawaan)',['#02030a','#2dd4bf','#e5e9f0']],['kaca','Kaca',['#6366f1','#2dd4bf','#ec4899']],['neon','Neon Tepi',['#04060c','#2dd4bf','#f472b6']],['lembut','Lembut Timbul',['#161b26','#2dd4bf','#9fb0c8']],['bento','Bento',['#134e4a','#1a1530','#f1f5f9']],['langkah','Rel Langkah',['#0b1120','#6366f1','#f472b6']],['kertas','Kertas Terang',['#f3efe7','#0f766e','#b45309']],['hud','HUD Antariksa',['#03060c','#2dd4bf','#fbbf24']],['aurora','Aurora Gradien',['#8b5cf6','#2dd4bf','#f472b6']],['senja','Senja Hangat',['#3a1546','#fdba74','#fb7185']],['topo','Peta Topografi',['#0f1a14','#86efac','#fcd34d']],['polaroid','Polaroid',['#2b2a33','#fbf8f2','#fcd34d']],['brutal','Neo-Brutal',['#fff7d6','#fde047','#fb7185']]];
+(function(){
+ var DEF={tema:'klasik',wall:'auto',img:null,dim:35};
+ function valid(s){var ok=false;for(var i=0;i<window.TEMA_LIST.length;i++)if(window.TEMA_LIST[i][0]===s.tema)ok=true;if(!ok)s.tema='klasik';
+  if(['auto','bintang','gambar'].indexOf(s.wall)<0)s.wall='auto';
+  if(typeof s.img!=='string'||s.img.indexOf('data:image/')!==0)s.img=null;
+  s.dim=Math.max(0,Math.min(80,+s.dim||0));return s;}
+ window.temaAmbil=function(){var l=null;try{l=JSON.parse(localStorage.getItem('sg_tema')||'null')}catch(e){}
+  return valid(Object.assign({},DEF,window.TEMA_DEFAULT||{},l||{}));};
+ window.temaDefault=function(){return valid(Object.assign({},DEF,window.TEMA_DEFAULT||{}));};
+ window.temaTerap=function(s){
+  var h=document.documentElement,mode=s.wall;
+  if(mode==='gambar'&&!s.img)mode='auto';
+  if(mode==='auto')mode=(s.tema==='klasik')?'bintang':'tema';
+  h.setAttribute('data-tema',s.tema);
+  h.className=h.className.replace(/\b(w-[a-z]+|t-x)\b/g,'').replace(/\s+/g,' ').trim();
+  h.classList.add('w-'+mode);h.classList.add('t-x');
+  var w=document.getElementById('wall');
+  if(w){w.style.backgroundImage=(mode==='gambar')?'url("'+s.img+'")':'';w.style.setProperty('--dim',String((s.dim||0)/100));}
+ };
+ window.temaTerap(window.temaAmbil());
+ document.addEventListener('DOMContentLoaded',function(){window.temaTerap(window.temaAmbil());});
+})();
+</script>
 </head>
 <body>
 <script>
@@ -142,6 +306,7 @@ window.PIN_RANTAI=null;
 try{if(window.PIN_RANTAI||window.PIN_API||window.PIN_TETAP||localStorage.getItem('sg_pin'))document.body.classList.add('pinlock')}catch(e){if(window.PIN_RANTAI||window.PIN_API||window.PIN_TETAP)document.body.classList.add('pinlock')}
 </script>
 <canvas id="bg" aria-hidden="true"></canvas>
+<div id="wall" aria-hidden="true"></div>
 <div id="pinLock" role="dialog" aria-modal="true" aria-labelledby="pinJudul"></div>
 <header class="top">
  <h1>
@@ -149,7 +314,7 @@ try{if(window.PIN_RANTAI||window.PIN_API||window.PIN_TETAP||localStorage.getItem
   Suanggi Geotag
  </h1>
  <p>Stempel visual di gambar, plus metadata EXIF yang sama di dalam file.</p>
- <div class="pinbar"><button type="button" class="sec" id="pinKunci" style="display:none">🔒 Kunci sekarang</button><button type="button" class="sec" id="pinAtur">🔓 Pasang PIN</button></div>
+ <div class="pinbar"><button type="button" class="sec" id="pinKunci" style="display:none">🔒 Kunci sekarang</button><button type="button" class="sec" id="pinAtur">🔓 Pasang PIN</button><button type="button" class="sec" id="temaBtn" style="display:none">🎨 Tampilan</button></div>
 </header>
 
 <!-- tab nav — 1 app, 2 tool -->
@@ -166,6 +331,7 @@ try{if(window.PIN_RANTAI||window.PIN_API||window.PIN_TETAP||localStorage.getItem
 
 <!-- Tab Foto -->
 <div id="tabFoto">
+<div class="kol">
 
 <section class="card" aria-labelledby="h-foto">
  <h2 id="h-foto">1 · Foto</h2>
@@ -251,6 +417,7 @@ try{if(window.PIN_RANTAI||window.PIN_API||window.PIN_TETAP||localStorage.getItem
  <div class="warn" id="metaWarn" style="display:none"></div>
 </section>
 
+</div><div class="kol">
 <section class="card" aria-labelledby="h-hasil">
  <h2 id="h-hasil">5 · Hasil</h2>
  <label class="chk" style="margin-top:0">
@@ -313,6 +480,7 @@ try{if(window.PIN_RANTAI||window.PIN_API||window.PIN_TETAP||localStorage.getItem
 </section>
 
 <canvas id="cv" role="img" aria-label="Pratinjau foto dengan stempel geotag"></canvas>
+</div>
 
 </div><!-- /tabFoto -->
 
@@ -1636,7 +1804,7 @@ function switchTab(name){
   const btnFoto=$('tabBtnFoto'), btnKmp=$('tabBtnKompres');
   if(!foto||!kmp) return;
   const k=(name==='kompres');
-  foto.style.display=k?'none':'block';
+  foto.style.display=k?'none':'';
   kmp.style.display=k?'block':'none';
   btnFoto.classList.toggle('active',!k); btnFoto.setAttribute('aria-selected',k?'false':'true');
   btnKmp.classList.toggle('active',k);   btnKmp.setAttribute('aria-selected',k?'true':'false');
@@ -2404,7 +2572,7 @@ function kunci(){
    '<input id="pIn" class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" aria-label="PIN" placeholder="••••">'+
    '<div class="perr" id="pErr" role="alert"></div><div class="pact"><button type="button" id="pOk">Buka</button></div>'+
    '<div class="pact" id="pGWrap" style="display:none"><button type="button" class="sec" id="pGoogle">Masuk lewat halaman Google</button></div>'+
-   '<p style="margin-top:14px;font-size:.75rem">'+(RANTAI()?'Kode berganti tiap hari pukul 05.00. Minta kode terbaru kepada admin.':API()?'PIN berganti otomatis. Jang Ngeyel.. Minta.. Pukiee wkwkwkwkwk.':TETAP()?'Lupa PIN? Pemilik aplikasi dapat mengganti baris PIN_TETAP di index.html.':'Lupa PIN? Hapus data situs browser ini untuk mengatur ulang.')+'</p>');
+   '<p style="margin-top:14px;font-size:.75rem">'+(RANTAI()?'Kode berganti tiap hari pukul 05.00. Minta kode terbaru kepada admin.':API()?'PIN berganti otomatis. Minta PIN terbaru kepada admin.':TETAP()?'Lupa PIN? Pemilik aplikasi dapat mengganti baris PIN_TETAP di index.html.':'Lupa PIN? Hapus data situs browser ini untuk mengatur ulang.')+'</p>');
   $('pIn').addEventListener('input',angka);
   $('pIn').addEventListener('keydown',e=>{if(e.key==='Enter')buka();});
   $('pOk').addEventListener('click',buka);
@@ -2636,6 +2804,117 @@ addEventListener('pagehide',stop);
 setInterval(()=>{ if(!document.hidden&&lastFrame&&performance.now()-lastFrame>2500){stop();start();} },2000);
 let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(resize,200);});
 resize();start();
+})();
+</script>
+<div id="temaBox" role="dialog" aria-modal="true" aria-labelledby="tmJudul"><div class="tbox">
+ <h2 id="tmJudul">🎨 Tampilan aplikasi (admin)</h2>
+ <p>Pilih gaya kartu dan wallpaper — langsung terlihat di perangkat ini. Agar berlaku untuk <b>semua pengguna</b>, tekan "Simpan jadi default", lalu ganti <code>index.html</code> di GitHub dengan file yang terunduh.</p>
+ <h3>Gaya kartu</h3>
+ <div class="tgrid" id="tmGrid"></div>
+ <h3>Wallpaper</h3>
+ <div class="trow" role="radiogroup" aria-label="Jenis wallpaper">
+  <label><input type="radio" name="tmW" value="auto"> Ikut gaya</label>
+  <label><input type="radio" name="tmW" value="bintang"> Bintang bergerak</label>
+  <label><input type="radio" name="tmW" value="gambar"> Gambar saya</label>
+ </div>
+ <label for="tmFile" style="margin-top:10px;display:block">Unggah gambar wallpaper (JPG / PNG / WebP / HEIC)</label>
+ <input type="file" id="tmFile" accept="image/*,.heic,.heif">
+ <div class="tprev" id="tmPrev" role="img" aria-label="Pratinjau wallpaper"></div>
+ <label for="tmDim" style="display:block">Gelapkan gambar: <b id="tmDimV">35%</b></label>
+ <input type="range" id="tmDim" min="0" max="80" step="5" value="35">
+ <div class="tact">
+  <button type="button" id="tmDefault">💾 Simpan jadi default semua pengguna</button>
+  <button type="button" class="sec" id="tmReset">↺ Kembali ke default</button>
+  <button type="button" class="sec" id="tmHapusGbr">Hapus gambar</button>
+  <button type="button" class="sec" id="tmTutup">Selesai</button>
+ </div>
+ <div class="tmsg" id="tmMsg" role="status" aria-live="polite"></div>
+</div></div>
+<script>
+/* ===== Panel admin 🎨 Tampilan (hanya muncul bila alamat memakai ?admin) ===== */
+(function(){
+ var ADMIN=/(^|[?&])admin(=|&|$)/.test(location.search);
+ var $=function(id){return document.getElementById(id);};
+ var btn=$('temaBtn'),box=$('temaBox');
+ if(!btn||!box||!ADMIN)return;
+ btn.style.display='';
+ var st=window.temaAmbil(),pemicu=null;
+ function msg(t,bad){var m=$('tmMsg');m.textContent=t||'';m.style.color=bad?'#fca5a5':'#86efac';}
+ function simpan(){try{localStorage.setItem('sg_tema',JSON.stringify(st));}catch(e){msg('Penyimpanan di perangkat penuh. Pakai gambar yang lebih kecil.',true);}}
+ function segar(){
+  window.temaTerap(st);
+  var g=$('tmGrid').children;
+  for(var i=0;i<g.length;i++)g[i].setAttribute('aria-pressed',g[i].getAttribute('data-id')===st.tema?'true':'false');
+  var r=document.getElementsByName('tmW');for(var j=0;j<r.length;j++)r[j].checked=(r[j].value===st.wall);
+  $('tmPrev').style.backgroundImage=st.img?'url("'+st.img+'")':'none';
+  $('tmDim').value=st.dim;$('tmDimV').textContent=st.dim+'%';
+  $('tmDim').disabled=!st.img;
+  $('tmHapusGbr').disabled=!st.img;
+ }
+ window.TEMA_LIST.forEach(function(t){
+  var b=document.createElement('button');b.type='button';b.className='topt';b.setAttribute('data-id',t[0]);
+  var sw=document.createElement('div');sw.className='tsw';
+  t[2].forEach(function(c){var i=document.createElement('i');i.style.background=c;i.style.border='1px solid rgba(255,255,255,.25)';sw.appendChild(i);});
+  var sp=document.createElement('span');sp.textContent=t[1];
+  b.appendChild(sw);b.appendChild(sp);
+  b.addEventListener('click',function(){st.tema=t[0];simpan();segar();msg('Gaya: '+t[1]);});
+  $('tmGrid').appendChild(b);
+ });
+ Array.prototype.forEach.call(document.getElementsByName('tmW'),function(r){r.addEventListener('change',function(){
+  st.wall=r.value;if(st.wall==='gambar'&&!st.img)msg('Pilih gambar dulu lewat tombol di bawah.',true);simpan();segar();});});
+ $('tmDim').addEventListener('input',function(){st.dim=+this.value;$('tmDimV').textContent=st.dim+'%';window.temaTerap(st);});
+ $('tmDim').addEventListener('change',function(){simpan();});
+ $('tmHapusGbr').addEventListener('click',function(){st.img=null;if(st.wall==='gambar')st.wall='auto';simpan();segar();msg('Gambar dihapus.');});
+ $('tmReset').addEventListener('click',function(){try{localStorage.removeItem('sg_tema');}catch(e){}st=window.temaDefault();segar();msg('Kembali ke tampilan default.');});
+ function bukaGambar(file){
+  return new Promise(function(res,rej){
+   var u=URL.createObjectURL(file),im=new Image();
+   im.onload=function(){URL.revokeObjectURL(u);res(im);};
+   im.onerror=function(){URL.revokeObjectURL(u);rej(new Error('Gambar tidak bisa dibuka.'));};
+   im.src=u;});
+ }
+ function kecilkan(im){
+  var W=im.naturalWidth||im.width,H=im.naturalHeight||im.height,hasil=null;
+  var sisi=[1600,1280,1000,800],kual=[.72,.6,.5,.4];
+  for(var a=0;a<sisi.length&&!hasil;a++){
+   var sc=Math.min(1,sisi[a]/Math.max(W,H)),c=document.createElement('canvas');
+   c.width=Math.max(1,Math.round(W*sc));c.height=Math.max(1,Math.round(H*sc));
+   c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+   for(var b=0;b<kual.length;b++){var d=c.toDataURL('image/jpeg',kual[b]);if(d.length<=300000){hasil=d;break;}if(a===sisi.length-1&&b===kual.length-1)hasil=d;}
+  }
+  return hasil;
+ }
+ $('tmFile').addEventListener('change',async function(e){
+  var f=e.target.files[0];if(!f)return;
+  msg('⏳ Memproses gambar…');
+  try{
+   if(typeof adalahHeic==='function'&&adalahHeic(f)&&typeof heicKeJpeg==='function')f=await heicKeJpeg(f);
+   var im=await bukaGambar(f),d=kecilkan(im);
+   st.img=d;st.wall='gambar';simpan();segar();
+   msg('✅ Wallpaper dipasang ('+Math.round(d.length*0.75/1024)+' KB). Atur kegelapan bila teks kurang jelas.');
+  }catch(err){msg('⚠️ '+(err&&err.message?err.message:'Gambar gagal diproses.'),true);}
+  e.target.value='';
+ });
+ $('tmDefault').addEventListener('click',async function(){
+  msg('⏳ Menyiapkan file…');
+  try{
+   var url=location.origin+location.pathname,r=await fetch(url,{cache:'no-store'});
+   if(!r.ok)throw new Error('Tidak bisa membaca halaman saat ini ('+r.status+').');
+   var t=await r.text(),re=/window\.TEMA_DEFAULT=[\s\S]*?;\/\*TEMA_DEFAULT\*\//;
+   if(!re.test(t))throw new Error('Penanda tema tidak ditemukan di halaman.');
+   var json=JSON.stringify({tema:st.tema,wall:st.wall,img:st.img,dim:st.dim}).replace(/</g,'\\u003c');
+   t=t.replace(re,function(){return 'window.TEMA_DEFAULT='+json+';/*TEMA_DEFAULT*/';});
+   var bl=new Blob([t],{type:'text/html'}),a=document.createElement('a');
+   a.href=URL.createObjectURL(bl);a.download='index.html';document.body.appendChild(a);a.click();a.remove();
+   setTimeout(function(){URL.revokeObjectURL(a.href);},15000);
+   msg('✅ File index.html terunduh. Ganti file di GitHub (git add, commit, push) — setelah 1–2 menit semua pengguna melihat tampilan ini.');
+  }catch(err){msg('⚠️ '+(err&&err.message?err.message:'Gagal menyiapkan file.'),true);}
+ });
+ function buka(){pemicu=document.activeElement;box.classList.add('show');segar();msg('');var p=$('tmGrid').querySelector('[aria-pressed=true]');if(p)p.focus();}
+ function tutup(){box.classList.remove('show');if(pemicu&&pemicu.focus)pemicu.focus();}
+ btn.addEventListener('click',buka);$('tmTutup').addEventListener('click',tutup);
+ box.addEventListener('click',function(e){if(e.target===box)tutup();});
+ document.addEventListener('keydown',function(e){if(e.key==='Escape'&&box.classList.contains('show'))tutup();});
 })();
 </script>
 </body>
